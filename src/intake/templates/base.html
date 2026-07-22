@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    {# The client is a tablet held in one hand at a bench. This tag is not
+       optional — without it mobile browsers render at desktop width and every
+       touch target ends up too small to hit. #}
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}benchhud-intake{% endblock %}</title>
+  </head>
+  <body>
+    <header>
+      <h1>{% block heading %}benchhud-intake{% endblock %}</h1>
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
