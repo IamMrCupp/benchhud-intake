@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from intake.db import connect
 from intake.schema import initialise
+from intake.status import Status
 from intake.store import Ticket, TicketStore
 
 app = FastAPI(
@@ -158,6 +159,37 @@ def create_intake(
         return _render_form(request, values=submitted, error=str(exc), status_code=400)
 
     return RedirectResponse(url=f"/intake/{ticket.ref}", status_code=303)
+
+
+@app.get("/tickets", response_class=HTMLResponse)
+def ticket_list(request: Request, store: StoreDep, status: str | None = None) -> HTMLResponse:
+    """Work that's still on the bench.
+
+    Open tickets by default, built from the derived ``OPEN_STATUSES`` so a newly
+    added status can't quietly disappear from this page.
+
+    **No contact details are rendered here.** It's the screen most likely to be
+    left open on a bench or read over a shoulder, and the customer name is
+    enough to recognise a ticket — phone, email and return address stay on the
+    detail page.
+    """
+    try:
+        tickets = (
+            store.list_tickets(status=status) if status else store.list_tickets(open_only=True)
+        )
+    except ValueError as exc:
+        # An unknown ?status= is a bad request, not a server fault.
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+    return templates.TemplateResponse(
+        request=request,
+        name="tickets.html",
+        context={
+            "tickets": tickets,
+            "status": status,
+            "all_statuses": [s.value for s in Status],
+        },
+    )
 
 
 @app.get("/intake/{ref}", response_class=HTMLResponse)

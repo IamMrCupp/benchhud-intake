@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Tickets — benchhud-intake{% endblock %}
+{% block heading %}{% if status %}{{ status }} tickets{% else %}Open tickets{% endif %}{% endblock %}
+
+{% block content %}
+  <p class="actions">
+    <a href="/intake">New intake</a>
+  </p>
+
+  {% if tickets %}
+    {# Deliberately no contact details here. This screen gets left open on a
+       bench and read over shoulders; the customer name is enough to recognise
+       a ticket, and phone/email/address belong on the detail page only. #}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Ref</th>
+          <th scope="col">Device</th>
+          <th scope="col">Customer</th>
+          <th scope="col">Status</th>
+          <th scope="col">Taken in</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+          <tr>
+            <td class="ref"><a href="/tickets/{{ ticket.ref }}">{{ ticket.ref }}</a></td>
+            <td>{{ ticket.device }}</td>
+            <td>{{ ticket.customer_name }}</td>
+            <td>{{ ticket.status }}{% if ticket.outcome %} ({{ ticket.outcome }}){% endif %}</td>
+            <td>{{ ticket.created_at[:10] }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">
+      {% if status %}
+        No {{ status }} tickets.
+      {% else %}
+        No open tickets. Nothing waiting on the bench.
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <p class="filters">
+    {% if status %}<a href="/tickets">Open</a>{% else %}<strong>Open</strong>{% endif %}
+    {% for name in all_statuses %}
+      &middot;
+      {% if status == name %}
+        <strong>{{ name }}</strong>
+      {% else %}
+        <a href="/tickets?status={{ name }}">{{ name }}</a>
+      {% endif %}
+    {% endfor %}
+  </p>
+{% endblock %}
