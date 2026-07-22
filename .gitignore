@@ -3,7 +3,15 @@ __pycache__/
 *.pyc
 *.log
 .env
+
+# Customer data. Live copies live on a cluster PVC, so these only ever appear on
+# a dev box — but this is the repo holding PII, so the patterns cover every
+# sidecar SQLite can produce. Production runs journal_mode=TRUNCATE (NFS), which
+# writes -journal; local dev may still use WAL, which writes -wal and -shm.
 intake.db
+intake.db-journal
+intake.db-wal
+intake.db-shm
 uploads/
 dist/
 build/
