@@ -19,7 +19,26 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from intake.refs import allocate_counter, format_ref, parse_ref
-from intake.status import OPEN_STATUSES, Outcome, Status
+from intake.status import OPEN_STATUSES, Outcome, Status, validate_outcome
+
+#: Intake details that can be edited after the fact.
+#:
+#: `status` and `outcome` are deliberately absent — they move through
+#: `set_status`, which is where the outcome invariant is enforced. Letting them
+#: through here would be a second, unguarded path to the same state.
+_EDITABLE = frozenset(
+    {
+        "device",
+        "serial",
+        "symptoms",
+        "customer_name",
+        "phone",
+        "email",
+        "return_address",
+        "accessories",
+        "condition_notes",
+    }
+)
 
 _COLUMNS = (
     "year, counter, device, serial, symptoms, customer_name, phone, email,"
@@ -149,6 +168,95 @@ class TicketStore:
             )
 
         return self.get_by_ref(format_ref(self.year, counter))  # type: ignore[return-value]
+
+    def set_status(
+        self,
+        ref: str,
+        status: Status,
+        outcome: Outcome | None = None,
+    ) -> Ticket:
+        """Move a ticket through the workflow.
+
+        The graph is deliberately permissive between open states: a quote gets
+        declined, a part arrives wrong, a board comes back a week later. What's
+        enforced is the outcome invariant, not the order.
+
+        **Reopening clears the outcome** — a ticket that isn't finished can't
+        still record how it finished.
+        """
+        self._require(ref)
+
+        # Not coerced: passing an outcome alongside an open status is a caller
+        # bug and should say so. Omitting it while moving to an open status is
+        # the reopen path, and writes NULL over whatever was there.
+        validate_outcome(status, outcome)
+
+        stamp = _now()
+        year, counter = parse_ref(ref)
+        with self.conn:
+            self.conn.execute(
+                "UPDATE tickets SET status = ?, outcome = ?, updated_at = ?"
+                " WHERE year = ? AND counter = ?",
+                (status.value, outcome.value if outcome else None, stamp, year, counter),
+            )
+
+        return self.get_by_ref(ref)  # type: ignore[return-value]
+
+    def update_ticket(self, ref: str, **fields: str | None) -> Ticket:
+        """Edit intake details after the fact.
+
+        Only the fields in ``_EDITABLE`` — status changes go through
+        ``set_status`` so there's exactly one guarded path to a closed ticket.
+        An unknown field name raises rather than being ignored, so a typo'd
+        kwarg can't silently do nothing.
+        """
+        current = self._require(ref)
+
+        unknown = set(fields) - _EDITABLE
+        if unknown:
+            raise ValueError(f"not editable: {', '.join(sorted(unknown))}")
+        if not fields:
+            return current
+
+        # Re-check the invariants the record was created under, against the
+        # post-edit values. An edit is just another way to reach an invalid
+        # state — blanking the only contact method strands the customer.
+        def after(name: str, existing: str | None) -> str | None:
+            return fields.get(name, existing)
+
+        device = (after("device", current.device) or "").strip()
+        customer_name = (after("customer_name", current.customer_name) or "").strip()
+        phone = _clean(after("phone", current.phone))
+        email = _clean(after("email", current.email))
+        if not device:
+            raise ValueError("device is required")
+        if not customer_name:
+            raise ValueError("customer_name is required")
+        if phone is None and email is None:
+            raise ValueError("a ticket needs at least one of phone or email")
+
+        assignments = ", ".join(f"{name} = ?" for name in fields)
+        values = [_clean(v) if isinstance(v, str) or v is None else v for v in fields.values()]
+        year, counter = parse_ref(ref)
+
+        with self.conn:
+            self.conn.execute(
+                f"UPDATE tickets SET {assignments}, updated_at = ? WHERE year = ? AND counter = ?",
+                (*values, _now(), year, counter),
+            )
+
+        return self.get_by_ref(ref)  # type: ignore[return-value]
+
+    def _require(self, ref: str) -> Ticket:
+        """Fetch a ticket that must exist.
+
+        Reading a missing ticket is normal (``get_by_ref`` returns ``None``);
+        *writing* to one is a caller bug, so this raises instead.
+        """
+        ticket = self.get_by_ref(ref)
+        if ticket is None:
+            raise LookupError(f"no such ticket: {ref}")
+        return ticket
 
     # -- reading ------------------------------------------------------------
 
