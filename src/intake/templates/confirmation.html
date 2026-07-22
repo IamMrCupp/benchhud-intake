@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticket.ref }} — benchhud-intake{% endblock %}
+{% block heading %}Ticket created{% endblock %}
+
+{% block content %}
+  {# The ref is the entire point of this page. It gets read across the bench
+     and copied onto a strip of tape stuck to the board, so it wants to be
+     legible at arm's length rather than merely present. #}
+  <p class="ref-display">{{ ticket.ref }}</p>
+
+  <p class="ref-instruction">Write this on the tape.</p>
+
+  <dl>
+    <dt>Device</dt>
+    <dd>{{ ticket.device }}</dd>
+
+    <dt>Customer</dt>
+    <dd>{{ ticket.customer_name }}</dd>
+
+    {% if ticket.symptoms %}
+      <dt>Reported fault</dt>
+      <dd>{{ ticket.symptoms }}</dd>
+    {% endif %}
+  </dl>
+
+  <p>
+    <a href="/intake">Take in another</a>
+    &middot;
+    <a href="/tickets/{{ ticket.ref }}">Open this ticket</a>
+  </p>
+{% endblock %}
