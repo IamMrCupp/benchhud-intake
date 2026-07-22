@@ -23,6 +23,12 @@ def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+@app.get("/intake", response_class=HTMLResponse)
+def intake_form(request: Request) -> HTMLResponse:
+    """The intake form — what someone fills in with a customer at the bench."""
+    return templates.TemplateResponse(request=request, name="intake.html")
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     """Liveness/readiness probe.
