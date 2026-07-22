@@ -72,13 +72,47 @@ def is_open(status: Status) -> bool:
     return status in OPEN_STATUSES
 
 
-def validate_outcome(status: Status, outcome: Outcome | None) -> None:
+def to_status(value: Status | str) -> Status:
+    """Coerce to a ``Status``, raising a readable error for anything unknown.
+
+    Callers hand this strings — the intake form posts them, the benchhud API
+    takes them as query params — so coercion belongs at the boundary rather
+    than in each caller.
+    """
+    try:
+        return Status(value)
+    except ValueError:
+        known = ", ".join(s.value for s in Status)
+        raise ValueError(f"unknown status {value!r}; expected one of: {known}") from None
+
+
+def to_outcome(value: Outcome | str | None) -> Outcome | None:
+    """Coerce to an ``Outcome``, or ``None``. Blank strings count as ``None``."""
+    if value is None or value == "":
+        return None
+    try:
+        return Outcome(value)
+    except ValueError:
+        known = ", ".join(o.value for o in Outcome)
+        raise ValueError(f"unknown outcome {value!r}; expected one of: {known}") from None
+
+
+def validate_outcome(status: Status | str, outcome: Outcome | str | None) -> None:
     """Enforce: an outcome exists if and only if the ticket is closed.
 
     Mirrors the ``outcome_iff_closed`` CHECK constraint in the schema. The
     database is the backstop; this is the layer that produces a decent error
     message instead of an ``IntegrityError``.
+
+    **Coerces its arguments first.** ``Status`` is a ``StrEnum``, so
+    ``"closed" == Status.CLOSED`` is True while ``"closed" is Status.CLOSED``
+    is False — an identity check against a raw string silently passed a closed
+    ticket with no outcome straight through. Normalising up front means the
+    comparisons below are always enum-to-enum.
     """
+    status = to_status(status)
+    outcome = to_outcome(outcome)
+
     if status is Status.CLOSED and outcome is None:
         raise ValueError("closing a ticket requires an outcome")
 
