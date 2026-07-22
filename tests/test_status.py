@@ -16,7 +16,6 @@ from intake.status import (
     validate_outcome,
 )
 
-
 # --- vocabulary -------------------------------------------------------------
 
 
@@ -63,7 +62,7 @@ def test_open_statuses_is_everything_except_closed() -> None:
     hide those tickets from the bench queue — indistinguishable, from the
     outside, from losing the ticket.
     """
-    assert OPEN_STATUSES == set(Status) - {Status.CLOSED}
+    assert set(Status) - {Status.CLOSED} == OPEN_STATUSES
 
 
 def test_every_status_is_classified() -> None:
