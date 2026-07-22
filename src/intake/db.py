@@ -35,7 +35,16 @@ def connect(path: str | Path) -> sqlite3.Connection:
     Callers get rows accessible by column name and foreign keys enforced, which
     SQLite otherwise leaves off.
     """
-    conn = sqlite3.connect(path)
+    # check_same_thread=False because FastAPI runs a sync dependency and the
+    # sync endpoint it feeds on *different* threadpool threads. Without this,
+    # roughly two thirds of concurrent requests fail with "SQLite objects
+    # created in a thread can only be used in that same thread" — measured, not
+    # theoretical.
+    #
+    # Safe here because a connection is created per request and never shared
+    # between them: the threads touch it in sequence, never concurrently. It
+    # would NOT be safe with a single module-level connection.
+    conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
 
     if _on_nfs():
