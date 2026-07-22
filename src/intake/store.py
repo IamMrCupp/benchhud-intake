@@ -19,7 +19,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from intake.refs import allocate_counter, format_ref, parse_ref
-from intake.status import OPEN_STATUSES, Outcome, Status, validate_outcome
+from intake.status import (
+    OPEN_STATUSES,
+    Outcome,
+    Status,
+    to_outcome,
+    to_status,
+    validate_outcome,
+)
 
 #: Intake details that can be edited after the fact.
 #:
@@ -172,8 +179,8 @@ class TicketStore:
     def set_status(
         self,
         ref: str,
-        status: Status,
-        outcome: Outcome | None = None,
+        status: Status | str,
+        outcome: Outcome | str | None = None,
     ) -> Ticket:
         """Move a ticket through the workflow.
 
@@ -186,9 +193,15 @@ class TicketStore:
         """
         self._require(ref)
 
-        # Not coerced: passing an outcome alongside an open status is a caller
-        # bug and should say so. Omitting it while moving to an open status is
-        # the reopen path, and writes NULL over whatever was there.
+        # Coerce before validating: callers pass strings straight off a form or
+        # a query param, and Status is a StrEnum, so an identity check against a
+        # raw string would silently skip the invariant.
+        status = to_status(status)
+        outcome = to_outcome(outcome)
+
+        # An outcome alongside an open status is a caller bug and should say so
+        # rather than being quietly dropped. Omitting it while moving to an open
+        # status is the reopen path, and writes NULL over whatever was there.
         validate_outcome(status, outcome)
 
         stamp = _now()
@@ -278,7 +291,7 @@ class TicketStore:
     def list_tickets(
         self,
         *,
-        status: Status | None = None,
+        status: Status | str | None = None,
         open_only: bool = False,
     ) -> list[Ticket]:
         """Tickets, newest first — the bench cares about what just came in.
@@ -292,7 +305,7 @@ class TicketStore:
 
         if status is not None:
             sql += " WHERE status = ?"
-            params.append(status.value)
+            params.append(to_status(status).value)
         elif open_only:
             marks = ", ".join("?" * len(OPEN_STATUSES))
             sql += f" WHERE status IN ({marks})"
