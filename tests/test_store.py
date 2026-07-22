@@ -159,10 +159,24 @@ def test_list_is_empty_on_a_fresh_store(store) -> None:
     assert store.list_tickets() == []
 
 
+def _force_status(store: TicketStore, ref: str, status: str, outcome: str | None = None) -> None:
+    """Set a status over raw SQL.
+
+    Transitions are C.2's job; this item is create-and-read only. Going around
+    the (not yet written) setter keeps the listing tests honest about what
+    they're exercising.
+    """
+    store.conn.execute(
+        "UPDATE tickets SET status = ?, outcome = ? WHERE year || '-' || counter = ?",
+        (status, outcome, ref.split("-")[0] + "-" + str(int(ref.split("-")[1]))),
+    )
+    store.conn.commit()
+
+
 def test_list_filters_by_status(store) -> None:
     first = _create(store)
     _create(store)
-    store.set_status(first.ref, Status.DIAGNOSING)
+    _force_status(store, first.ref, "diagnosing")
 
     assert [t.ref for t in store.list_tickets(status=Status.DIAGNOSING)] == [first.ref]
 
@@ -171,7 +185,7 @@ def test_list_open_only_excludes_closed(store) -> None:
     """The set Phase 5 serves as ?status=open."""
     open_ticket = _create(store)
     closed = _create(store)
-    store.set_status(closed.ref, Status.CLOSED, outcome="repaired")
+    _force_status(store, closed.ref, "closed", "repaired")
 
     refs = [t.ref for t in store.list_tickets(open_only=True)]
     assert refs == [open_ticket.ref]
