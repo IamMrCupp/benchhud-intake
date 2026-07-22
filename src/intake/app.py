@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from intake.db import connect
@@ -73,14 +73,48 @@ def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+#: Every field the form posts. Used to echo submitted values back on a
+#: rejection, so nothing typed is lost.
+_FORM_FIELDS = (
+    "customer_name",
+    "phone",
+    "email",
+    "return_address",
+    "device",
+    "serial",
+    "symptoms",
+    "accessories",
+    "condition_notes",
+)
+
+
+def _render_form(
+    request: Request,
+    values: dict[str, str] | None = None,
+    error: str | None = None,
+    status_code: int = 200,
+) -> HTMLResponse:
+    """Render the intake form, optionally repopulated with a rejected attempt."""
+    return templates.TemplateResponse(
+        request=request,
+        name="intake.html",
+        context={
+            "values": {name: (values or {}).get(name, "") for name in _FORM_FIELDS},
+            "error": error,
+        },
+        status_code=status_code,
+    )
+
+
 @app.get("/intake", response_class=HTMLResponse)
 def intake_form(request: Request) -> HTMLResponse:
     """The intake form — what someone fills in with a customer at the bench."""
-    return templates.TemplateResponse(request=request, name="intake.html")
+    return _render_form(request)
 
 
 @app.post("/intake")
 def create_intake(
+    request: Request,
     store: StoreDep,
     customer_name: Annotated[str, Form()] = "",
     phone: Annotated[str, Form()] = "",
@@ -91,7 +125,7 @@ def create_intake(
     symptoms: Annotated[str, Form()] = "",
     accessories: Annotated[str, Form()] = "",
     condition_notes: Annotated[str, Form()] = "",
-) -> RedirectResponse:
+) -> Response:
     """Create a ticket from a submitted form.
 
     **Redirects rather than rendering.** Showing the confirmation straight from
@@ -102,17 +136,26 @@ def create_intake(
     Every value arrives as a string, and untouched optional fields arrive as
     ``""``; the store normalises those to ``None``.
     """
-    ticket = store.create_ticket(
-        customer_name=customer_name,
-        phone=phone,
-        email=email,
-        return_address=return_address,
-        device=device,
-        serial=serial,
-        symptoms=symptoms,
-        accessories=accessories,
-        condition_notes=condition_notes,
-    )
+    submitted = {
+        "customer_name": customer_name,
+        "phone": phone,
+        "email": email,
+        "return_address": return_address,
+        "device": device,
+        "serial": serial,
+        "symptoms": symptoms,
+        "accessories": accessories,
+        "condition_notes": condition_notes,
+    }
+
+    try:
+        ticket = store.create_ticket(**submitted)
+    except ValueError as exc:
+        # Hand the form back with everything still in it. The person is at a
+        # bench with a customer in front of them; making them re-type a
+        # multi-line address because they forgot a phone number is a worse
+        # failure than the validation error itself.
+        return _render_form(request, values=submitted, error=str(exc), status_code=400)
 
     return RedirectResponse(url=f"/intake/{ticket.ref}", status_code=303)
 

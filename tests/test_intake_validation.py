@@ -80,9 +80,7 @@ def test_rejection_does_not_burn_a_ref(client, store) -> None:
     [("customer_name", ""), ("customer_name", "   "), ("device", ""), ("device", "  ")],
 )
 def test_blank_required_fields_are_rejected(client, field, value) -> None:
-    response = client.post(
-        "/intake", data={**FILLED_FORM, "phone": "555-0100", field: value}
-    )
+    response = client.post("/intake", data={**FILLED_FORM, "phone": "555-0100", field: value})
 
     assert response.status_code == 400
 

@@ -4,6 +4,10 @@
 {% block heading %}New intake{% endblock %}
 
 {% block content %}
+  {% if error %}
+    <p class="error" role="alert">{{ error }}</p>
+  {% endif %}
+
   <form method="post" action="/intake">
 
     <fieldset>
@@ -12,6 +16,7 @@
       <p>
         <label for="customer_name">Name <span aria-hidden="true">*</span></label>
         <input type="text" id="customer_name" name="customer_name"
+               value="{{ values.customer_name }}"
                autofocus required autocomplete="name" />
       </p>
 
@@ -21,17 +26,17 @@
 
       <p>
         <label for="phone">Phone</label>
-        <input type="tel" id="phone" name="phone" autocomplete="tel" />
+        <input type="tel" id="phone" name="phone" value="{{ values.phone }}" autocomplete="tel" />
       </p>
 
       <p>
         <label for="email">Email</label>
-        <input type="email" id="email" name="email" autocomplete="email" />
+        <input type="email" id="email" name="email" value="{{ values.email }}" autocomplete="email" />
       </p>
 
       <p>
         <label for="return_address">Return address</label>
-        <textarea id="return_address" name="return_address" rows="3"></textarea>
+        <textarea id="return_address" name="return_address" rows="3">{{ values.return_address }}</textarea>
         <span class="hint">Only for anything being shipped back. Leave blank for walk-ins.</span>
       </p>
     </fieldset>
@@ -42,18 +47,18 @@
       <p>
         <label for="device">What is it? <span aria-hidden="true">*</span></label>
         <input type="text" id="device" name="device" required
-               placeholder="Pioneer CDJ-3000" />
+               value="{{ values.device }}" placeholder="Pioneer CDJ-3000" />
       </p>
 
       <p>
         <label for="serial">Serial</label>
-        <input type="text" id="serial" name="serial" />
+        <input type="text" id="serial" name="serial" value="{{ values.serial }}" />
       </p>
 
       <p>
         <label for="symptoms">Reported fault</label>
         <textarea id="symptoms" name="symptoms" rows="3"
-                  placeholder="What does the customer say it does?"></textarea>
+                  placeholder="What does the customer say it does?">{{ values.symptoms }}</textarea>
       </p>
     </fieldset>
 
@@ -63,13 +68,14 @@
       <p>
         <label for="accessories">Accessories</label>
         <input type="text" id="accessories" name="accessories"
+               value="{{ values.accessories }}"
                placeholder="charger, no drive, 3 screws in a bag" />
       </p>
 
       <p>
         <label for="condition_notes">Condition notes</label>
         <textarea id="condition_notes" name="condition_notes" rows="3"
-                  placeholder="Dents, cracks, scuffs — anything you'd want a record of"></textarea>
+                  placeholder="Dents, cracks, scuffs — anything you'd want a record of">{{ values.condition_notes }}</textarea>
         <span class="hint">Photos come next, but write down what you can see now.</span>
       </p>
     </fieldset>
