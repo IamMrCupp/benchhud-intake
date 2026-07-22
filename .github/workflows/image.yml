@@ -1,9 +1,19 @@
 name: Image
 
+# Docs-only changes don't affect the image. Without these filters a README edit
+# costs several minutes of QEMU emulation to rebuild both architectures.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - ".github/pull_request_template.md"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - ".github/pull_request_template.md"
 
 permissions:
   contents: read
@@ -43,3 +53,18 @@ jobs:
           tags: ghcr.io/iammrcupp/benchhud-intake:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The deploy target is a Raspberry Pi cluster. If linux/arm64 ever falls
+      # out of the platforms list above, this fails the build here rather than
+      # letting a pod fail to schedule on the cluster days later.
+      - name: Assert published manifest includes linux/arm64
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          manifest=$(docker buildx imagetools inspect ghcr.io/iammrcupp/benchhud-intake:latest)
+          echo "$manifest"
+          if ! grep -q 'linux/arm64' <<<"$manifest"; then
+            echo "::error::published manifest does not advertise linux/arm64"
+            exit 1
+          fi
+          echo "✓ linux/arm64 present in published manifest"
