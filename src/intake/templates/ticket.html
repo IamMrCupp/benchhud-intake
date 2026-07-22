@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticket.ref }} — benchhud-intake{% endblock %}
+{% block heading %}{{ ticket.ref }}{% endblock %}
+
+{% block content %}
+  <p class="actions"><a href="/tickets">All tickets</a></p>
+
+  {% if error %}
+    <p class="error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <p class="status-line">
+    <strong>{{ ticket.status }}</strong>
+    {% if ticket.outcome %}<span class="outcome">— {{ ticket.outcome }}</span>{% endif %}
+  </p>
+
+  <section>
+    <h2>Device</h2>
+    <dl>
+      <dt>What it is</dt><dd>{{ ticket.device }}</dd>
+      {% if ticket.serial %}<dt>Serial</dt><dd>{{ ticket.serial }}</dd>{% endif %}
+      {% if ticket.symptoms %}<dt>Reported fault</dt><dd>{{ ticket.symptoms }}</dd>{% endif %}
+      {% if ticket.accessories %}<dt>Came in with</dt><dd>{{ ticket.accessories }}</dd>{% endif %}
+      {% if ticket.condition_notes %}
+        <dt>Condition at intake</dt><dd>{{ ticket.condition_notes }}</dd>
+      {% endif %}
+    </dl>
+  </section>
+
+  {# Contact details live here and nowhere else. The list page deliberately
+     omits them; this is the page you open on purpose when you need to ring
+     someone about their board. #}
+  <section>
+    <h2>Customer</h2>
+    <dl>
+      <dt>Name</dt><dd>{{ ticket.customer_name }}</dd>
+      {% if ticket.phone %}<dt>Phone</dt><dd>{{ ticket.phone }}</dd>{% endif %}
+      {% if ticket.email %}<dt>Email</dt><dd>{{ ticket.email }}</dd>{% endif %}
+      {% if ticket.return_address %}
+        <dt>Return address</dt><dd class="address">{{ ticket.return_address }}</dd>
+      {% endif %}
+    </dl>
+  </section>
+
+  {# Phase 3 hangs condition photos here. #}
+
+  <section>
+    <h2>Move it along</h2>
+
+    <form method="post" action="/tickets/{{ ticket.ref }}/status">
+      <p>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          {% for name in all_statuses %}
+            <option value="{{ name }}" {% if ticket.status == name %}selected{% endif %}>
+              {{ name }}
+            </option>
+          {% endfor %}
+        </select>
+      </p>
+
+      {# Offered next to the status rather than behind a second step, so
+         "closing needs an outcome" is visible before submitting instead of
+         arriving as an error afterwards. #}
+      <p>
+        <label for="outcome">Outcome <span class="hint">(required when closing)</span></label>
+        <select id="outcome" name="outcome">
+          <option value="">—</option>
+          {% for name in all_outcomes %}
+            <option value="{{ name }}" {% if ticket.outcome == name %}selected{% endif %}>
+              {{ name }}
+            </option>
+          {% endfor %}
+        </select>
+      </p>
+
+      <p><button type="submit">Update</button></p>
+    </form>
+  </section>
+
+  <p class="timestamps">
+    Taken in {{ ticket.created_at }} &middot; last touched {{ ticket.updated_at }}
+  </p>
+{% endblock %}

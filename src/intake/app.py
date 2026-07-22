@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from intake.db import connect
 from intake.schema import initialise
-from intake.status import Status
+from intake.status import Outcome, Status
 from intake.store import Ticket, TicketStore
 
 app = FastAPI(
@@ -200,6 +200,59 @@ def intake_confirmation(request: Request, ref: str, store: StoreDep) -> HTMLResp
         name="confirmation.html",
         context={"ticket": _require_ticket(store, ref)},
     )
+
+
+def _render_ticket(
+    request: Request,
+    ticket: Ticket,
+    error: str | None = None,
+    status_code: int = 200,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="ticket.html",
+        context={
+            "ticket": ticket,
+            "error": error,
+            "all_statuses": [s.value for s in Status],
+            "all_outcomes": [o.value for o in Outcome],
+        },
+        status_code=status_code,
+    )
+
+
+@app.get("/tickets/{ref}", response_class=HTMLResponse)
+def ticket_detail(request: Request, ref: str, store: StoreDep) -> HTMLResponse:
+    """Everything about one ticket.
+
+    Unlike the list, this page **does** show contact details — it's the one you
+    open deliberately when you need to ring someone about their board.
+    """
+    return _render_ticket(request, _require_ticket(store, ref))
+
+
+@app.post("/tickets/{ref}/status")
+def update_ticket_status(
+    request: Request,
+    ref: str,
+    store: StoreDep,
+    status: Annotated[str, Form()] = "",
+    outcome: Annotated[str, Form()] = "",
+) -> Response:
+    """Move a ticket through the workflow.
+
+    Redirects on success so a refresh doesn't replay the transition. On a
+    rejection — closing with no outcome, an outcome on an open status, an
+    unknown status — the page comes back with the error rather than a 500.
+    """
+    ticket = _require_ticket(store, ref)
+
+    try:
+        store.set_status(ref, status, outcome=outcome or None)
+    except ValueError as exc:
+        return _render_ticket(request, ticket, error=str(exc), status_code=400)
+
+    return RedirectResponse(url=f"/tickets/{ref}", status_code=303)
 
 
 def _require_ticket(store: TicketStore, ref: str) -> Ticket:
