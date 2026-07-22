@@ -39,3 +39,17 @@ path = "src/intake/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/intake"]
+
+# Kept deliberately identical to benchhud's config (minus its Qt bits) so the
+# two repos lint the same way and muscle memory transfers between them.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
