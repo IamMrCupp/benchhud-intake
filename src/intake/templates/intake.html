@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}New intake — benchhud-intake{% endblock %}
+{% block heading %}New intake{% endblock %}
+
+{% block content %}
+  <form method="post" action="/intake">
+
+    <fieldset>
+      <legend>Customer</legend>
+
+      <p>
+        <label for="customer_name">Name <span aria-hidden="true">*</span></label>
+        <input type="text" id="customer_name" name="customer_name"
+               autofocus required autocomplete="name" />
+      </p>
+
+      {# HTML can't express "at least one of these two", so say it in words.
+         Marking either one `required` would block a perfectly valid intake. #}
+      <p class="hint">Enter at least one way to reach them — phone or email.</p>
+
+      <p>
+        <label for="phone">Phone</label>
+        <input type="tel" id="phone" name="phone" autocomplete="tel" />
+      </p>
+
+      <p>
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="email" />
+      </p>
+
+      <p>
+        <label for="return_address">Return address</label>
+        <textarea id="return_address" name="return_address" rows="3"></textarea>
+        <span class="hint">Only for anything being shipped back. Leave blank for walk-ins.</span>
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Device</legend>
+
+      <p>
+        <label for="device">What is it? <span aria-hidden="true">*</span></label>
+        <input type="text" id="device" name="device" required
+               placeholder="Pioneer CDJ-3000" />
+      </p>
+
+      <p>
+        <label for="serial">Serial</label>
+        <input type="text" id="serial" name="serial" />
+      </p>
+
+      <p>
+        <label for="symptoms">Reported fault</label>
+        <textarea id="symptoms" name="symptoms" rows="3"
+                  placeholder="What does the customer say it does?"></textarea>
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Came in with</legend>
+
+      <p>
+        <label for="accessories">Accessories</label>
+        <input type="text" id="accessories" name="accessories"
+               placeholder="charger, no drive, 3 screws in a bag" />
+      </p>
+
+      <p>
+        <label for="condition_notes">Condition notes</label>
+        <textarea id="condition_notes" name="condition_notes" rows="3"
+                  placeholder="Dents, cracks, scuffs — anything you'd want a record of"></textarea>
+        <span class="hint">Photos come next, but write down what you can see now.</span>
+      </p>
+    </fieldset>
+
+    <p><button type="submit">Create ticket</button></p>
+  </form>
+{% endblock %}
