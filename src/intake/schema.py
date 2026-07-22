@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Duplicated from intake.status, which doesn't exist yet — it lands in B.2 along
 # with the test that asserts these two lists never drift apart. Until then this
@@ -89,13 +89,35 @@ CREATE TABLE IF NOT EXISTS tickets (
 # forever and are never in that result set.
 _CREATE_STATUS_INDEX = "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status);"
 
+# A monotonic sequence per year, deliberately separate from the tickets table.
+#
+# The obvious alternative — MAX(counter) + 1 over tickets — reuses a ref if the
+# highest ticket is ever deleted. Refs get spoken aloud and written on tape, so
+# a reused one points at the wrong customer's board. A counter that only ever
+# climbs can't do that, and it makes allocation atomic as a side effect: a
+# single UPDATE is its own transaction, with no read-then-write gap to race in.
+_CREATE_REF_COUNTERS = """
+CREATE TABLE IF NOT EXISTS ref_counters (
+    year         INTEGER PRIMARY KEY,
+    last_counter INTEGER NOT NULL DEFAULT 0
+);
+"""
+
 
 def initialise(conn: sqlite3.Connection) -> None:
-    """Create the schema if absent. Safe to call on every startup."""
-    if conn.execute("PRAGMA user_version").fetchone()[0] >= SCHEMA_VERSION:
+    """Create or upgrade the schema. Safe to call on every startup.
+
+    Every statement is ``IF NOT EXISTS``, so a database already at the current
+    version short-circuits and one at an older version picks up only what it's
+    missing. There is no downgrade path — this is a single-deployment app, and
+    rolling back a schema is a restore-from-backup problem, not a migration one.
+    """
+    current = conn.execute("PRAGMA user_version").fetchone()[0]
+    if current >= SCHEMA_VERSION:
         return
 
     with conn:
         conn.execute(_CREATE_TICKETS)
         conn.execute(_CREATE_STATUS_INDEX)
+        conn.execute(_CREATE_REF_COUNTERS)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

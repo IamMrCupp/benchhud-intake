@@ -143,7 +143,9 @@ def test_concurrent_allocation_never_duplicates(db_path) -> None:
             return [allocate_counter(c, 26) for _ in range(per_worker)]
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = [n for batch in pool.map(lambda _: allocate_many(), range(workers)) for n in batch]
+        results = [
+            n for batch in pool.map(lambda _: allocate_many(), range(workers)) for n in batch
+        ]
 
     assert len(results) == workers * per_worker
     assert len(set(results)) == len(results), "duplicate ref allocated"
