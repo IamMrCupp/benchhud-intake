@@ -10,12 +10,13 @@ import pytest
 
 from intake.auth import configured_hash, hash_password, verify_password
 
-
 # --- round trip -------------------------------------------------------------
 
 
 def test_hash_then_verify() -> None:
-    assert verify_password("correct horse battery staple", hash_password("correct horse battery staple"))
+    assert verify_password(
+        "correct horse battery staple", hash_password("correct horse battery staple")
+    )
 
 
 def test_wrong_password_is_rejected() -> None:
@@ -41,7 +42,8 @@ def test_hash_does_not_contain_the_password() -> None:
 
 
 def test_unicode_passwords_work() -> None:
-    mixed = "pässwörd–日本–🎛"
+    # Accents, CJK and an emoji — the realistic ways a password stops being ASCII.
+    mixed = "pässwörd 日本 🎛"
 
     assert verify_password(mixed, hash_password(mixed))
 
