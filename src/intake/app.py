@@ -16,6 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from intake import auth
 from intake.auth import verify_password
 from intake.db import connect
+from intake.ratelimit import RateLimiter
 from intake.schema import initialise
 from intake.status import Outcome, Status
 from intake.store import Ticket, TicketStore
@@ -41,6 +42,21 @@ EXEMPT_PATHS = frozenset({"/healthz", "/login"})
 
 #: Methods that change state and therefore need a CSRF token.
 _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+#: Failed-login throttle. In-memory and per-process, which is fine while the
+#: Deployment stays at `replicas: 1` — see intake/ratelimit.py for what this
+#: does and does not protect against.
+login_limiter = RateLimiter()
+
+
+def _client_ip(request: Request) -> str | None:
+    """Best-effort client address.
+
+    Deliberately ignores `X-Forwarded-For`: nothing terminates in front of this
+    service today, so honouring a client-supplied header would let anyone reset
+    their own throttle bucket by changing it. Revisit if a proxy ever lands.
+    """
+    return request.client.host if request.client else None
 
 
 @app.middleware("http")
@@ -211,7 +227,27 @@ def login(
     configured, nor anything about its shape. There's one password here; every
     extra detail narrows a guess.
     """
+    client = _client_ip(request)
+
+    if not login_limiter.allowed(client):
+        # Checked before the password so a locked-out client can't keep probing,
+        # and so lockout costs no scrypt work — otherwise the throttle becomes
+        # its own CPU amplifier on a Pi.
+        wait = login_limiter.retry_after(client)
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "next": _safe_next(next),
+                # Ceiling division: a 300s wait is "5 minutes", not 6.
+                "error": f"Too many attempts. Try again in {-(-wait // 60)} minute(s).",
+            },
+            status_code=429,
+            headers={"Retry-After": str(wait)},
+        )
+
     if not verify_password(password, auth.configured_hash()):
+        login_limiter.record_failure(client)
         return templates.TemplateResponse(
             request=request,
             name="login.html",
@@ -219,6 +255,7 @@ def login(
             status_code=401,
         )
 
+    login_limiter.record_success(client)
     request.session["authenticated"] = True
     return RedirectResponse(url=_safe_next(next), status_code=303)
 

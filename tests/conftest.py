@@ -12,6 +12,7 @@ the app unconfigured and get a confusing error a long way from the cause.
 
 import os
 
+import pytest
 from fastapi.testclient import TestClient
 
 from intake.auth import COOKIE_SECURE_ENV_VAR, ENV_VAR, SESSION_ENV_VAR, hash_password
@@ -70,3 +71,19 @@ def sign_in(client):
     response = client.post("/login", data={"password": TEST_PASSWORD, "csrf_token": match.group(1)})
     assert response.status_code in (200, 303), f"test sign-in failed: {response.status_code}"
     return client
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_throttle():
+    """Give every test a clean rate-limit bucket.
+
+    The limiter is process-global and `TestClient` always reports the same host,
+    so without this every wrong-password test in the suite shares one counter.
+    Nothing breaks today, but the fifth such test added anywhere would start
+    failing tests that have nothing to do with it — a nasty thing to debug.
+    """
+    from intake.app import login_limiter
+
+    login_limiter._failures.clear()
+    yield
+    login_limiter._failures.clear()
