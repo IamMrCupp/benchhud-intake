@@ -21,3 +21,15 @@ TEST_PASSWORD = "bench password"
 os.environ.setdefault(ENV_VAR, hash_password(TEST_PASSWORD))
 os.environ.setdefault(SESSION_ENV_VAR, "test-session-secret-not-a-real-one")
 os.environ.setdefault(COOKIE_SECURE_ENV_VAR, "0")
+
+
+def sign_in(client):
+    """Give a test client a session.
+
+    Every route except `/healthz` and `/login` needs one, so any test about page
+    content has to authenticate first. Tests *about* the gate deliberately don't
+    call this — see `tests/test_auth_required.py`.
+    """
+    response = client.post("/login", data={"password": TEST_PASSWORD})
+    assert response.status_code in (200, 303), "test sign-in failed"
+    return client

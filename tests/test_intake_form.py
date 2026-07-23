@@ -9,9 +9,11 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import sign_in
 from intake.app import app
 
-client = TestClient(app)
+# Signed in: every route but /healthz and /login needs a session.
+client = sign_in(TestClient(app))
 
 
 @pytest.fixture

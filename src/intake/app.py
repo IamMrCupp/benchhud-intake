@@ -6,6 +6,7 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -24,6 +25,35 @@ app = FastAPI(
     description="Self-hosted repair intake. Holds customer PII — LAN-only, never publicly exposed.",
 )
 
+#: The only paths reachable without a session.
+#:
+#: **Deny by default.** Protection is applied to everything and lifted here,
+#: rather than added per-route — the inverse arrangement means a route added in
+#: a later phase (photo upload, thumbnail download) ships unprotected the moment
+#: somebody forgets a decorator, and a silent leak of customer data is a much
+#: worse failure than a route that's visibly unreachable.
+#:
+#: `/healthz` is the Kubernetes probe and must answer before a session can
+#: exist; `/login` obviously cannot require being logged in. Nothing else
+#: belongs here, and `tests/test_auth_required.py` enumerates the routing table
+#: to keep that honest.
+EXEMPT_PATHS = frozenset({"/healthz", "/login"})
+
+
+@app.middleware("http")
+async def require_session(request: Request, call_next):
+    """Demand a session for everything outside ``EXEMPT_PATHS``."""
+    if request.url.path in EXEMPT_PATHS or request.session.get("authenticated"):
+        return await call_next(request)
+
+    # Carry the requested path so a deep link opened cold still lands where it
+    # was pointed after signing in.
+    target = quote(request.url.path, safe="/")
+    return RedirectResponse(url=f"/login?next={target}", status_code=303)
+
+
+# Added last, so it wraps the auth middleware — the session has to be decoded
+# before anything can check it.
 app.add_middleware(
     SessionMiddleware,
     secret_key=auth.session_secret(),
