@@ -7,6 +7,8 @@ unprotected. That test enumerates the app's own routing table, so it fails on a
 new unlisted route rather than trusting anyone to remember.
 """
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -36,17 +38,32 @@ def client(db_path):
     app.dependency_overrides.clear()
 
 
+def _login_data(client, password, **extra):
+    """Login form data including the CSRF token, read from the page.
+
+    This module drives a raw client on purpose — it's testing the gate — so it
+    does the browser's job by hand rather than using the auto-token client.
+    """
+    match = re.search(r'name="csrf_token"\s+value="([^"]+)"', client.get("/login").text)
+    assert match, "login form is missing its CSRF token"
+    return {"password": password, "csrf_token": match.group(1), **extra}
+
+
 @pytest.fixture
 def signed_in(client):
-    client.post("/login", data={"password": TEST_PASSWORD})
+    client.post("/login", data=_login_data(client, TEST_PASSWORD))
     return client
 
 
 @pytest.fixture
 def ticket(signed_in):
+    token = re.search(r'name="csrf_token"\s+value="([^"]+)"', signed_in.get("/intake").text).group(
+        1
+    )
     signed_in.post(
         "/intake",
         data={
+            "csrf_token": token,
             "customer_name": "DJ in LA",
             "device": "Pioneer CDJ-3000",
             "phone": "555-0100",
@@ -119,7 +136,7 @@ def test_login_page_is_reachable_signed_out(client) -> None:
 
 def test_login_post_is_reachable_signed_out(client) -> None:
     """Obvious, but a gate that blocks its own login is a real mistake."""
-    assert client.post("/login", data={"password": "wrong"}).status_code == 401
+    assert client.post("/login", data=_login_data(client, "wrong")).status_code == 401
 
 
 # --- signed in --------------------------------------------------------------
@@ -135,7 +152,10 @@ def test_signed_in_can_create_and_read(signed_in, ticket) -> None:
 
 
 def test_logout_re_locks(signed_in, ticket) -> None:
-    signed_in.post("/logout")
+    token = re.search(r'name="csrf_token"\s+value="([^"]+)"', signed_in.get("/tickets").text).group(
+        1
+    )
+    signed_in.post("/logout", data={"csrf_token": token})
 
     assert signed_in.get("/tickets", follow_redirects=False).status_code == 303
 
@@ -157,7 +177,7 @@ def test_deep_link_survives_the_login(client, db_path) -> None:
 
     response = client.post(
         "/login",
-        data={"password": TEST_PASSWORD, "next": next_target},
+        data=_login_data(client, TEST_PASSWORD, next=next_target),
         follow_redirects=False,
     )
 

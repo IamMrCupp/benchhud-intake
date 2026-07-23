@@ -9,9 +9,8 @@ noticing, and that have concrete right answers.
 import re
 
 import pytest
-from fastapi.testclient import TestClient
 
-from conftest import sign_in
+from conftest import CsrfClient, sign_in
 from intake.app import app, get_store
 from intake.db import connect
 from intake.schema import initialise
@@ -35,7 +34,7 @@ def client(db_path):
     app.dependency_overrides[get_store] = _store
     # Auth gates everything but /healthz and /login, so a client testing page
     # content has to sign in. The gate itself is tested in test_auth_required.
-    yield sign_in(TestClient(app))
+    yield sign_in(CsrfClient(app))
     app.dependency_overrides.clear()
 
 

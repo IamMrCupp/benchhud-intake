@@ -9,6 +9,8 @@
   {% endif %}
 
   <form method="post" action="/login">
+    {# Deny-by-default: the middleware rejects any POST without this. #}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     {# Carried through the round-trip so a deep link into a ticket still lands
        where it was pointed. Validated server-side — never trusted as a URL. #}
     <input type="hidden" name="next" value="{{ next }}" />

@@ -12,6 +12,8 @@ the app unconfigured and get a confusing error a long way from the cause.
 
 import os
 
+from fastapi.testclient import TestClient
+
 from intake.auth import COOKIE_SECURE_ENV_VAR, ENV_VAR, SESSION_ENV_VAR, hash_password
 
 TEST_PASSWORD = "bench password"
@@ -23,6 +25,33 @@ os.environ.setdefault(SESSION_ENV_VAR, "test-session-secret-not-a-real-one")
 os.environ.setdefault(COOKIE_SECURE_ENV_VAR, "0")
 
 
+class CsrfClient(TestClient):
+    """A client that carries its CSRF token, the way a browser does.
+
+    Tests about page behaviour shouldn't each re-implement "read the hidden
+    field, post it back" — that's browser mechanics, not the thing under test.
+    Tests *about* CSRF use a plain `TestClient` so they can omit or corrupt the
+    token deliberately.
+
+    An explicitly supplied `csrf_token` always wins, so a test can still pass a
+    deliberately wrong one through this client.
+    """
+
+    def post(self, url, *, data=None, **kwargs):
+        if isinstance(data, dict) and "csrf_token" not in data:
+            data = {**data, "csrf_token": self._csrf()}
+        return super().post(url, data=data, **kwargs)
+
+    def _csrf(self) -> str:
+        import re
+
+        for page in ("/tickets", "/login"):
+            match = re.search(r'name="csrf_token"\s+value="([^"]+)"', self.get(page).text)
+            if match:
+                return match.group(1)
+        raise AssertionError("could not find a CSRF token on any accessible page")
+
+
 def sign_in(client):
     """Give a test client a session.
 
@@ -30,6 +59,14 @@ def sign_in(client):
     content has to authenticate first. Tests *about* the gate deliberately don't
     call this — see `tests/test_auth_required.py`.
     """
-    response = client.post("/login", data={"password": TEST_PASSWORD})
-    assert response.status_code in (200, 303), "test sign-in failed"
+    import re
+
+    # /login is exempt from *auth* but not from CSRF, so the token has to come
+    # from the rendered form — exactly as a browser would do it.
+    page = client.get("/login").text
+    match = re.search(r'name="csrf_token"\s+value="([^"]+)"', page)
+    assert match, "login form is missing its CSRF token"
+
+    response = client.post("/login", data={"password": TEST_PASSWORD, "csrf_token": match.group(1)})
+    assert response.status_code in (200, 303), f"test sign-in failed: {response.status_code}"
     return client

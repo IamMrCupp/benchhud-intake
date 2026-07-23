@@ -125,6 +125,32 @@ def cookie_secure() -> bool:
     return os.environ.get(COOKIE_SECURE_ENV_VAR, "") not in ("", "0")
 
 
+def csrf_token(session: dict) -> str:
+    """A per-session CSRF token, minted on first use.
+
+    Stored in the session rather than derived from it, so it can't be
+    reconstructed by anyone who learns how the session is built. A stolen token
+    from a different session is useless because it simply won't match.
+    """
+    token = session.get("csrf")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf"] = token
+    return token
+
+
+def csrf_valid(session: dict, submitted: str | None) -> bool:
+    """Check a submitted token against the session's.
+
+    Constant-time, and ``False`` when either side is missing — an absent token
+    must fail closed rather than being treated as "nothing to compare".
+    """
+    expected = session.get("csrf")
+    if not expected or not submitted:
+        return False
+    return hmac.compare_digest(expected, submitted)
+
+
 def _main() -> None:
     """Generate a hash to paste into the environment or a Kubernetes Secret."""
     import getpass

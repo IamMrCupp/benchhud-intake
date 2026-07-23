@@ -5,13 +5,11 @@ itself — inheritance resolving, the viewport tag surviving — rather than the
 placeholder copy, which is expected to change.
 """
 
-from fastapi.testclient import TestClient
-
-from conftest import sign_in
+from conftest import CsrfClient, sign_in
 from intake.app import app
 
 # Signed in: every route but /healthz and /login needs a session.
-client = sign_in(TestClient(app))
+client = sign_in(CsrfClient(app))
 
 
 def test_index_renders_html() -> None:

@@ -9,6 +9,8 @@
   {% endif %}
 
   <form method="post" action="/intake">
+    {# Deny-by-default: the middleware rejects any POST without this. #}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
 
     <fieldset>
       <legend>Customer</legend>
