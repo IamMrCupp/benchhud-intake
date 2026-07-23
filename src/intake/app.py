@@ -9,7 +9,7 @@ from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -39,17 +39,50 @@ app = FastAPI(
 #: to keep that honest.
 EXEMPT_PATHS = frozenset({"/healthz", "/login"})
 
+#: Methods that change state and therefore need a CSRF token.
+_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
 
 @app.middleware("http")
 async def require_session(request: Request, call_next):
-    """Demand a session for everything outside ``EXEMPT_PATHS``."""
-    if request.url.path in EXEMPT_PATHS or request.session.get("authenticated"):
-        return await call_next(request)
+    """Demand a session for everything outside ``EXEMPT_PATHS``, and a valid
+    CSRF token on every state-changing request.
 
-    # Carry the requested path so a deep link opened cold still lands where it
-    # was pointed after signing in.
-    target = quote(request.url.path, safe="/")
-    return RedirectResponse(url=f"/login?next={target}", status_code=303)
+    Both checks are deny-by-default for the same reason: a form added in a later
+    phase should be safe without anyone remembering to opt it in.
+
+    ``samesite=lax`` on the session cookie already blocks cross-site POSTs in
+    current browsers, and that's most of the protection. This is the
+    server-side half — one mechanism enforced by the client isn't where you
+    want the only defence for customer records, particularly on whatever
+    browser a bench tablet happens to be running.
+    """
+    # Auth first. A request with no session has nothing worth forging against,
+    # and "go and sign in" is a more useful answer than "unverifiable".
+    if request.url.path not in EXEMPT_PATHS and not request.session.get("authenticated"):
+        target = quote(request.url.path, safe="/")
+        return RedirectResponse(url=f"/login?next={target}", status_code=303)
+
+    if request.method in _MUTATING_METHODS:
+        # Reading the form here consumes the request stream, so the body has to
+        # be replayed or the endpoint downstream sees an empty form and every
+        # submission looks like a blank one. Found the hard way: without this,
+        # login failed as "wrong password" with a perfectly correct password.
+        body = await request.body()
+
+        async def _replay() -> dict:
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        request._receive = _replay
+
+        form = await request.form()
+        if not auth.csrf_valid(request.session, form.get("csrf_token")):
+            return PlainTextResponse(
+                "Request could not be verified. Reload the page and try again.",
+                status_code=403,
+            )
+
+    return await call_next(request)
 
 
 # Added last, so it wraps the auth middleware — the session has to be decoded
@@ -65,7 +98,27 @@ app.add_middleware(
 # Resolved relative to this module, not the working directory — the app runs
 # from a container image where cwd is not the repo root.
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+def _csrf_context(request: Request) -> dict[str, str]:
+    """Make ``csrf_token`` available to every template.
+
+    A context processor rather than a per-route context entry, for the same
+    deny-by-default reason as the auth middleware: a template added later gets
+    the token without anyone remembering to pass it, and a form that omits the
+    hidden field fails visibly at the first POST instead of silently dropping
+    protection.
+    """
+    return {
+        "csrf_token": auth.csrf_token(request.session),
+        # Distinct from the token: a token exists *before* sign-in, because the
+        # login form itself needs one. Keying UI on the token would show a
+        # "Sign out" button to someone who has never signed in.
+        "authenticated": bool(request.session.get("authenticated")),
+    }
+
+
+templates = Jinja2Templates(directory=TEMPLATES_DIR, context_processors=[_csrf_context])
 
 
 def get_db_path() -> Path:

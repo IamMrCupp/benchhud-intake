@@ -7,13 +7,12 @@ a tablet show the right keyboard, which is most of the "minimal typing" goal.
 import re
 
 import pytest
-from fastapi.testclient import TestClient
 
-from conftest import sign_in
+from conftest import CsrfClient, sign_in
 from intake.app import app
 
 # Signed in: every route but /healthz and /login needs a session.
-client = sign_in(TestClient(app))
+client = sign_in(CsrfClient(app))
 
 
 @pytest.fixture

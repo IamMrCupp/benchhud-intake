@@ -11,12 +11,11 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import sign_in
 from intake.app import app, get_store
 from intake.db import connect
 from intake.schema import initialise
 from intake.store import TicketStore
-
-from conftest import TEST_PASSWORD, sign_in
 
 
 @pytest.fixture
@@ -82,9 +81,7 @@ def test_post_with_a_garbage_token_is_refused(client) -> None:
 def test_post_with_a_truncated_token_is_refused(client) -> None:
     good = _token(client)
 
-    response = client.post(
-        "/intake", data=_intake_data(token=good[:-4]), follow_redirects=False
-    )
+    response = client.post("/intake", data=_intake_data(token=good[:-4]), follow_redirects=False)
 
     assert response.status_code == 403
 
@@ -119,9 +116,7 @@ def test_a_token_from_another_session_is_refused(client, db_path) -> None:
     other = sign_in(TestClient(app))
     foreign = _token(other)
 
-    response = client.post(
-        "/intake", data=_intake_data(token=foreign), follow_redirects=False
-    )
+    response = client.post("/intake", data=_intake_data(token=foreign), follow_redirects=False)
 
     assert response.status_code == 403
 

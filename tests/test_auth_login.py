@@ -11,8 +11,8 @@ cheap now and awkward to retrofit once someone relies on the current behaviour.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 
+from conftest import CsrfClient
 from intake.app import app, get_store
 from intake.auth import hash_password
 from intake.db import connect
@@ -43,7 +43,7 @@ def client(db_path):
             yield TicketStore(conn, year=26)
 
     app.dependency_overrides[get_store] = _store
-    yield TestClient(app)
+    yield CsrfClient(app)
     app.dependency_overrides.clear()
 
 
@@ -99,9 +99,16 @@ def test_wrong_password_is_rejected(client) -> None:
 
 
 def test_wrong_password_grants_no_session(client) -> None:
+    """A rejected login must not authenticate.
+
+    Note the session *cookie* may still exist — it carries the CSRF token, which
+    the login form needs before you've signed in. What must not happen is the
+    session being marked authenticated, so this asserts on reachability of a
+    gated page rather than on the cookie itself.
+    """
     _login(client, password="not the password")
 
-    assert not client.cookies.get("session")
+    assert client.get("/tickets", follow_redirects=False).status_code == 303
 
 
 def test_empty_password_is_rejected(client) -> None:
@@ -124,14 +131,14 @@ def test_logout_ends_the_session(client) -> None:
     _login(client)
     assert client.cookies.get("session")
 
-    client.post("/logout", follow_redirects=False)
+    client.post("/logout", data={}, follow_redirects=False)
 
     assert not client.cookies.get("session")
 
 
 def test_logout_redirects_to_login(client) -> None:
     _login(client)
-    response = client.post("/logout", follow_redirects=False)
+    response = client.post("/logout", data={}, follow_redirects=False)
 
     assert response.status_code == 303
     assert response.headers["location"] == "/login"
