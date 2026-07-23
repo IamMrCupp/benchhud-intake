@@ -23,6 +23,8 @@ import os
 import secrets
 
 ENV_VAR = "INTAKE_PASSWORD_HASH"
+SESSION_ENV_VAR = "INTAKE_SESSION_SECRET"
+COOKIE_SECURE_ENV_VAR = "INTAKE_COOKIE_SECURE"
 
 # scrypt parameters. n=16384 keeps verification around ~50ms on a Pi 4 — fast
 # enough that a login doesn't feel slow, slow enough that offline guessing is
@@ -91,6 +93,36 @@ def configured_hash() -> str:
             f"    uv run python -m intake.auth"
         )
     return value
+
+
+def session_secret() -> str:
+    """The key the session cookie is signed with.
+
+    Deliberately **not** a per-process random default. That looks fine in
+    development and then logs everyone out unpredictably across a restart or a
+    second worker — a bug that presents as "the app randomly forgets me".
+
+    Falls back to a value derived from the password hash so a deployment needs
+    exactly one configured secret to work. Rotating the password therefore
+    invalidates existing sessions, which is the behaviour you'd want anyway.
+    """
+    explicit = os.environ.get(SESSION_ENV_VAR, "").strip()
+    if explicit:
+        return explicit
+
+    return hashlib.sha256(f"session:{configured_hash()}".encode()).hexdigest()
+
+
+def cookie_secure() -> bool:
+    """Whether to mark the session cookie ``secure``.
+
+    **Off by default, and that's deliberate.** This service is LAN-only over
+    plain HTTP by design; a ``secure`` cookie would never be transmitted, so
+    login would appear to succeed and then silently fail on every subsequent
+    request. Turn it on with ``INTAKE_COOKIE_SECURE=1`` once something
+    terminates TLS in front of it.
+    """
+    return os.environ.get(COOKIE_SECURE_ENV_VAR, "") not in ("", "0")
 
 
 def _main() -> None:

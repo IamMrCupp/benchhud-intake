@@ -10,7 +10,10 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
+from intake import auth
+from intake.auth import verify_password
 from intake.db import connect
 from intake.schema import initialise
 from intake.status import Outcome, Status
@@ -19,6 +22,14 @@ from intake.store import Ticket, TicketStore
 app = FastAPI(
     title="benchhud-intake",
     description="Self-hosted repair intake. Holds customer PII — LAN-only, never publicly exposed.",
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=auth.session_secret(),
+    session_cookie="session",
+    https_only=auth.cookie_secure(),
+    same_site="lax",
 )
 
 # Resolved relative to this module, not the working directory — the app runs
@@ -72,6 +83,68 @@ def healthz() -> dict[str, str]:
 def index(request: Request) -> HTMLResponse:
     """Placeholder landing page. The intake form replaces this in Phase 2."""
     return templates.TemplateResponse(request=request, name="index.html")
+
+
+def _safe_next(target: str) -> str:
+    """Reduce ``?next=`` to a path on this host, or fall back to the ticket list.
+
+    A login URL is exactly the kind of thing that gets pasted into a message, so
+    an unvalidated ``next`` turns a genuine login into a bounce to somebody
+    else's page — the classic phishing shape. Only a single-slash absolute path
+    is allowed: ``//host`` and ``\\\\host`` are both browser-recognised ways of
+    naming another origin, and a scheme (``https:``, ``javascript:``) obviously
+    leaves entirely.
+    """
+    target = (target or "").strip()
+    if (
+        not target.startswith("/")
+        or target.startswith("//")
+        or target.startswith("/\\")
+        or ":" in target.split("/")[0]
+    ):
+        return "/tickets"
+    return target
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request, next: str = "") -> HTMLResponse:
+    """The sign-in page. Reachable without a session, by definition."""
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"next": _safe_next(next), "error": None},
+    )
+
+
+@app.post("/login")
+def login(
+    request: Request,
+    password: Annotated[str, Form()] = "",
+    next: Annotated[str, Form()] = "",
+) -> Response:
+    """Check the shared password and start a session.
+
+    A failure says only that the password is wrong — never whether one is
+    configured, nor anything about its shape. There's one password here; every
+    extra detail narrows a guess.
+    """
+    if not verify_password(password, auth.configured_hash()):
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={"next": _safe_next(next), "error": "That password is not right."},
+            status_code=401,
+        )
+
+    request.session["authenticated"] = True
+    return RedirectResponse(url=_safe_next(next), status_code=303)
+
+
+@app.post("/logout")
+def logout(request: Request) -> Response:
+    """End the session."""
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=303)
 
 
 #: Every field the form posts. Used to echo submitted values back on a
