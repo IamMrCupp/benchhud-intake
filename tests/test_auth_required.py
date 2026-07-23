@@ -10,12 +10,11 @@ new unlisted route rather than trusting anyone to remember.
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import TEST_PASSWORD
 from intake.app import EXEMPT_PATHS, app, get_store
 from intake.db import connect
 from intake.schema import initialise
 from intake.store import TicketStore
-
-from .conftest import TEST_PASSWORD
 
 
 @pytest.fixture
@@ -200,4 +199,4 @@ def test_every_route_is_protected_or_explicitly_exempt() -> None:
 
 def test_exempt_set_is_minimal() -> None:
     """Each exemption is a hole; there should be very few and each obvious."""
-    assert EXEMPT_PATHS == frozenset({"/healthz", "/login"})
+    assert frozenset({"/healthz", "/login"}) == EXEMPT_PATHS
