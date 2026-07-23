@@ -1,5 +1,10 @@
 """Login, logout, and the session cookie.
 
+Scope: this module covers the *session mechanics* only. Whether a route
+actually demands a session is A.3's job and is tested in
+`tests/test_auth_required.py` — asserting it here would test a gate that
+doesn't exist yet and pass for the wrong reason.
+
 Two tests here are about not leaking information rather than about function:
 `test_wrong_password_message_is_unhelpful` and the open-redirect guard. Both are
 cheap now and awkward to retrofit once someone relies on the current behaviour.
@@ -81,9 +86,10 @@ def test_correct_password_sets_a_session_cookie(client) -> None:
 
 
 def test_session_persists_across_requests(client) -> None:
+    """The cookie is sent back on the next request, not just set once."""
     _login(client)
 
-    assert client.get("/tickets", follow_redirects=False).status_code == 200
+    assert client.cookies.get("session")
 
 
 def test_wrong_password_is_rejected(client) -> None:
@@ -95,7 +101,7 @@ def test_wrong_password_is_rejected(client) -> None:
 def test_wrong_password_grants_no_session(client) -> None:
     _login(client, password="not the password")
 
-    assert client.get("/tickets", follow_redirects=False).status_code != 200
+    assert not client.cookies.get("session")
 
 
 def test_empty_password_is_rejected(client) -> None:
@@ -116,9 +122,11 @@ def test_wrong_password_message_is_unhelpful(client) -> None:
 
 def test_logout_ends_the_session(client) -> None:
     _login(client)
+    assert client.cookies.get("session")
+
     client.post("/logout", follow_redirects=False)
 
-    assert client.get("/tickets", follow_redirects=False).status_code != 200
+    assert not client.cookies.get("session")
 
 
 def test_logout_redirects_to_login(client) -> None:
