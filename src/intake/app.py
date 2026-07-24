@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
+    JSONResponse,
     PlainTextResponse,
     RedirectResponse,
     Response,
@@ -23,6 +24,7 @@ from intake import auth
 from intake.auth import verify_password
 from intake.db import connect
 from intake.photos import Photo, PhotoError, PhotoStore
+from intake.projection import to_benchhud_ticket
 from intake.ratelimit import RateLimiter
 from intake.schema import initialise
 from intake.status import Outcome, Status
@@ -80,10 +82,24 @@ async def require_session(request: Request, call_next):
     want the only defence for customer records, particularly on whatever
     browser a bench tablet happens to be running.
     """
-    # Auth first. A request with no session has nothing worth forging against,
-    # and "go and sign in" is a more useful answer than "unverifiable".
-    if request.url.path not in EXEMPT_PATHS and not request.session.get("authenticated"):
-        target = quote(request.url.path, safe="/")
+    path = request.url.path
+
+    # The machine-facing API is gated too — just by a bearer token or a session,
+    # since benchhud can't do the browser login. On failure it gets a 401 status
+    # code, not a 302 to an HTML page a service can't use. Still deny-by-default:
+    # this is a second gate, never an exemption.
+    if path.startswith("/api/"):
+        if auth.valid_api_token(request.headers.get("authorization")) or request.session.get(
+            "authenticated"
+        ):
+            return await call_next(request)
+        return JSONResponse({"detail": "unauthorized"}, status_code=401)
+
+    # Auth first for browser routes. A request with no session has nothing worth
+    # forging against, and "go and sign in" is a more useful answer than
+    # "unverifiable".
+    if path not in EXEMPT_PATHS and not request.session.get("authenticated"):
+        target = quote(path, safe="/")
         return RedirectResponse(url=f"/login?next={target}", status_code=303)
 
     if request.method in _MUTATING_METHODS:
@@ -562,6 +578,34 @@ def _serve(resolver, store: TicketStore, ref: str, name: str) -> FileResponse:
     if not path.is_file():
         raise HTTPException(status_code=404, detail="no such photo")
     return FileResponse(path)
+
+
+@app.get("/api/tickets")
+def api_list_tickets(request: Request, store: StoreDep, status: str | None = None) -> list[dict]:
+    """The work queue benchhud pulls.
+
+    Defaults to open (anything not closed) — the set a bench cares about. Each
+    ticket is the PII-filtered projection; see ``intake.projection``, which is
+    the single place customer data is reduced before it leaves this service.
+    """
+    try:
+        tickets = (
+            store.list_tickets(status=status)
+            if status and status != "open"
+            else store.list_tickets(open_only=True)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+    base = str(request.base_url)
+    return [to_benchhud_ticket(t, base) for t in tickets]
+
+
+@app.get("/api/tickets/{ref}")
+def api_get_ticket(request: Request, ref: str, store: StoreDep) -> dict:
+    """One ticket by ref, or 404 — benchhud's ``get_ticket`` path."""
+    ticket = _require_ticket(store, ref)
+    return to_benchhud_ticket(ticket, str(request.base_url))
 
 
 def _require_ticket(store: TicketStore, ref: str) -> Ticket:

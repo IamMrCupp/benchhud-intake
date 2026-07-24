@@ -113,6 +113,31 @@ def session_secret() -> str:
     return hashlib.sha256(f"session:{configured_hash()}".encode()).hexdigest()
 
 
+API_TOKEN_ENV_VAR = "INTAKE_API_TOKEN"
+
+
+def valid_api_token(authorization: str | None) -> bool:
+    """Check an ``Authorization: Bearer <token>`` header against the configured
+    API token.
+
+    **Fails closed.** If ``INTAKE_API_TOKEN`` is unset, this always returns
+    ``False`` — a deployment that hasn't configured a token must reject bearer
+    auth outright, never treat "no token" as "any token". The API token is
+    optional (intake runs fine without benchhud polling it), so unlike the
+    password its absence doesn't stop startup — it just means the API is only
+    reachable with a session.
+    """
+    configured = os.environ.get(API_TOKEN_ENV_VAR, "").strip()
+    if not configured or not authorization:
+        return False
+
+    scheme, _, presented = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not presented:
+        return False
+
+    return hmac.compare_digest(presented, configured)
+
+
 def cookie_secure() -> bool:
     """Whether to mark the session cookie ``secure``.
 
