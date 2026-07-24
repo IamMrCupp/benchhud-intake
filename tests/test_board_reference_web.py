@@ -6,7 +6,6 @@ are user-supplied and rendered into a page, which is exactly where a
 """
 
 import pytest
-from fastapi.testclient import TestClient
 
 from conftest import CsrfClient, sign_in
 from intake.app import app, get_photo_store, get_store
@@ -120,9 +119,7 @@ def test_a_link_can_be_added(client, store) -> None:
 
 def test_added_link_renders_clickable(client) -> None:
     client.post("/intake", data=_intake())
-    client.post(
-        "/tickets/26-0001/links", data={"label": "Boardview", "url": "http://nas/a.obv"}
-    )
+    client.post("/tickets/26-0001/links", data={"label": "Boardview", "url": "http://nas/a.obv"})
 
     body = client.get("/tickets/26-0001").text
     assert 'href="http://nas/a.obv"' in body
@@ -196,5 +193,7 @@ def test_the_new_forms_carry_a_csrf_token(client) -> None:
 
     import re
 
-    for form in re.findall(r"<form[^>]*action=\"/tickets/26-0001/links[^>]*>.*?</form>", body, re.S):
+    for form in re.findall(
+        r"<form[^>]*action=\"/tickets/26-0001/links[^>]*>.*?</form>", body, re.S
+    ):
         assert 'name="csrf_token"' in form

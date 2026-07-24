@@ -338,6 +338,7 @@ _FORM_FIELDS = (
     "symptoms",
     "accessories",
     "condition_notes",
+    "board_id",
 )
 
 
@@ -380,6 +381,7 @@ def create_intake(
     symptoms: Annotated[str, Form()] = "",
     accessories: Annotated[str, Form()] = "",
     condition_notes: Annotated[str, Form()] = "",
+    board_id: Annotated[str, Form()] = "",
 ) -> Response:
     """Create a ticket from a submitted form.
 
@@ -401,6 +403,7 @@ def create_intake(
         "symptoms": symptoms,
         "accessories": accessories,
         "condition_notes": condition_notes,
+        "board_id": board_id,
     }
 
     try:
@@ -463,6 +466,7 @@ def intake_confirmation(
 def _render_ticket(
     request: Request,
     ticket: Ticket,
+    store: TicketStore,
     photos: list[Photo] | None = None,
     error: str | None = None,
     photos_failed: int = 0,
@@ -474,6 +478,7 @@ def _render_ticket(
         context={
             "ticket": ticket,
             "photos": photos or [],
+            "links": store.list_links(ticket.ref),
             "error": error,
             "photos_failed": photos_failed,
             "all_statuses": [s.value for s in Status],
@@ -494,8 +499,55 @@ def ticket_detail(
     """
     ticket = _require_ticket(store, ref)
     return _render_ticket(
-        request, ticket, photos=photo_store.list_photos(ref), photos_failed=photos_failed
+        request, ticket, store, photos=photo_store.list_photos(ref), photos_failed=photos_failed
     )
+
+
+@app.post("/tickets/{ref}")
+def edit_ticket(
+    request: Request,
+    ref: str,
+    store: StoreDep,
+    photo_store: PhotoStoreDep,
+    board_id: Annotated[str, Form()] = "",
+) -> Response:
+    """Edit the ticket's board reference.
+
+    Its own endpoint rather than folding into the status control: board_id is
+    intake detail, status is workflow, and keeping them apart means editing one
+    can never accidentally move the other.
+    """
+    ticket = _require_ticket(store, ref)
+    try:
+        store.update_ticket(ref, board_id=board_id)
+    except ValueError as exc:
+        return _render_ticket(request, ticket, store, error=str(exc), status_code=400)
+    return RedirectResponse(url=f"/tickets/{ref}", status_code=303)
+
+
+@app.post("/tickets/{ref}/links")
+def add_ticket_link(
+    request: Request,
+    ref: str,
+    store: StoreDep,
+    label: Annotated[str, Form()] = "",
+    url: Annotated[str, Form()] = "",
+) -> Response:
+    """Attach a doc link — where a boardview or schematic lives."""
+    ticket = _require_ticket(store, ref)
+    try:
+        store.add_link(ref, label, url)
+    except ValueError as exc:
+        return _render_ticket(request, ticket, store, error=str(exc), status_code=400)
+    return RedirectResponse(url=f"/tickets/{ref}", status_code=303)
+
+
+@app.post("/tickets/{ref}/links/{link_id}/delete")
+def delete_ticket_link(ref: str, link_id: int, store: StoreDep) -> Response:
+    """Remove a doc link."""
+    _require_ticket(store, ref)
+    store.remove_link(ref, link_id)
+    return RedirectResponse(url=f"/tickets/{ref}", status_code=303)
 
 
 @app.post("/tickets/{ref}/photos")
@@ -537,7 +589,7 @@ def update_ticket_status(
     try:
         store.set_status(ref, status, outcome=outcome or None)
     except ValueError as exc:
-        return _render_ticket(request, ticket, error=str(exc), status_code=400)
+        return _render_ticket(request, ticket, store, error=str(exc), status_code=400)
 
     return RedirectResponse(url=f"/tickets/{ref}", status_code=303)
 
