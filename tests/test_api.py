@@ -6,11 +6,8 @@ The projection is unit-tested in test_projection.py; here we confirm it actually
 holds end-to-end through a real HTTP response.
 """
 
-import io
-
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
 
 from conftest import CsrfClient, sign_in
 from intake.app import app, get_photo_store, get_store
@@ -139,9 +136,10 @@ def test_open_tickets_are_listed(seeded) -> None:
 
 
 def test_default_is_open(seeded) -> None:
-    assert seeded.get("/api/tickets", headers=_auth()).json() == seeded.get(
-        "/api/tickets?status=open", headers=_auth()
-    ).json()
+    assert (
+        seeded.get("/api/tickets", headers=_auth()).json()
+        == seeded.get("/api/tickets?status=open", headers=_auth()).json()
+    )
 
 
 def test_a_specific_status_filters(seeded) -> None:

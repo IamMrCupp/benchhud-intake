@@ -207,12 +207,17 @@ def test_every_route_is_protected_or_explicitly_exempt() -> None:
     assert not unexpected_exempt, f"EXEMPT_PATHS lists routes that don't exist: {unexpected_exempt}"
 
     # Everything else must be gated. Asserted by behaviour, not by inspection.
+    # Browser routes redirect an un-sessioned request to /login (303); the
+    # machine-facing /api routes answer 401 (a service wants a status code, not
+    # an HTML login page). Both mean "not reachable without auth" — what must
+    # never appear here is a 200.
     with TestClient(app) as probe:
         for path in sorted(app_paths - documented):
             concrete = path.replace("{ref}", "26-0001")
             response = probe.get(concrete, follow_redirects=False)
-            assert response.status_code in (303, 405), (
-                f"{path} answered {response.status_code} without a session — "
+            allowed = (401, 405) if path.startswith("/api/") else (303, 405)
+            assert response.status_code in allowed, (
+                f"{path} answered {response.status_code} without auth — "
                 "new routes must be protected by default"
             )
 
