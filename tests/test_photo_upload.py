@@ -117,7 +117,9 @@ def test_intake_with_no_photo_still_works(client, photo_store) -> None:
 
 def test_an_empty_file_field_is_ignored(client, photo_store) -> None:
     """A browser submits an empty file part when nothing is chosen."""
-    client.post("/intake", data=_intake(), files=[("photos", ("", b"", "application/octet-stream"))])
+    client.post(
+        "/intake", data=_intake(), files=[("photos", ("", b"", "application/octet-stream"))]
+    )
 
     assert photo_store.list_photos("26-0001") == []
 

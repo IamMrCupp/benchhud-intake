@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -16,6 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from intake import auth
 from intake.auth import verify_password
 from intake.db import connect
+from intake.photos import Photo, PhotoError, PhotoStore
 from intake.ratelimit import RateLimiter
 from intake.schema import initialise
 from intake.status import Outcome, Status
@@ -166,6 +167,42 @@ def get_store() -> Iterator[TicketStore]:
 StoreDep = Annotated[TicketStore, Depends(get_store)]
 
 
+def get_uploads_path() -> Path:
+    """Where condition photos live.
+
+    Beside the database on the NFS PVC in production; a local directory
+    otherwise, already covered by `.gitignore`.
+    """
+    return Path(os.environ.get("INTAKE_UPLOADS_PATH", "uploads"))
+
+
+def get_photo_store() -> PhotoStore:
+    return PhotoStore(get_uploads_path())
+
+
+PhotoStoreDep = Annotated[PhotoStore, Depends(get_photo_store)]
+
+
+def _attach_photos(photo_store: PhotoStore, ref: str, uploads: list[UploadFile]) -> int:
+    """Save each uploaded photo against a ticket, returning how many failed.
+
+    A rejected photo (not an image, too large) is counted and skipped rather
+    than raised: the ticket is the record that matters, and a bad photo is
+    recoverable by retaking it while a lost intake is not. The store validates
+    and cleans up partials, so a failure can't corrupt anything — it just
+    doesn't attach.
+    """
+    failed = 0
+    for upload in uploads:
+        if not upload.filename:
+            continue  # an empty file part — nothing was chosen
+        try:
+            photo_store.save(ref, upload.filename, upload.file.read())
+        except PhotoError:
+            failed += 1
+    return failed
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     """Liveness/readiness probe.
@@ -310,6 +347,8 @@ def intake_form(request: Request) -> HTMLResponse:
 def create_intake(
     request: Request,
     store: StoreDep,
+    photo_store: PhotoStoreDep,
+    photos: Annotated[list[UploadFile], File()] = [],  # noqa: B006 - FastAPI reads this default
     customer_name: Annotated[str, Form()] = "",
     phone: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
@@ -351,7 +390,9 @@ def create_intake(
         # failure than the validation error itself.
         return _render_form(request, values=submitted, error=str(exc), status_code=400)
 
-    return RedirectResponse(url=f"/intake/{ticket.ref}", status_code=303)
+    failed = _attach_photos(photo_store, ticket.ref, photos)
+    suffix = f"?photos_failed={failed}" if failed else ""
+    return RedirectResponse(url=f"/intake/{ticket.ref}{suffix}", status_code=303)
 
 
 @app.get("/tickets", response_class=HTMLResponse)
@@ -386,19 +427,23 @@ def ticket_list(request: Request, store: StoreDep, status: str | None = None) ->
 
 
 @app.get("/intake/{ref}", response_class=HTMLResponse)
-def intake_confirmation(request: Request, ref: str, store: StoreDep) -> HTMLResponse:
+def intake_confirmation(
+    request: Request, ref: str, store: StoreDep, photos_failed: int = 0
+) -> HTMLResponse:
     """Confirmation after an intake. Its whole job is showing the ref."""
     return templates.TemplateResponse(
         request=request,
         name="confirmation.html",
-        context={"ticket": _require_ticket(store, ref)},
+        context={"ticket": _require_ticket(store, ref), "photos_failed": photos_failed},
     )
 
 
 def _render_ticket(
     request: Request,
     ticket: Ticket,
+    photos: list[Photo] | None = None,
     error: str | None = None,
+    photos_failed: int = 0,
     status_code: int = 200,
 ) -> HTMLResponse:
     return templates.TemplateResponse(
@@ -406,7 +451,9 @@ def _render_ticket(
         name="ticket.html",
         context={
             "ticket": ticket,
+            "photos": photos or [],
             "error": error,
+            "photos_failed": photos_failed,
             "all_statuses": [s.value for s in Status],
             "all_outcomes": [o.value for o in Outcome],
         },
@@ -415,13 +462,38 @@ def _render_ticket(
 
 
 @app.get("/tickets/{ref}", response_class=HTMLResponse)
-def ticket_detail(request: Request, ref: str, store: StoreDep) -> HTMLResponse:
+def ticket_detail(
+    request: Request, ref: str, store: StoreDep, photo_store: PhotoStoreDep, photos_failed: int = 0
+) -> HTMLResponse:
     """Everything about one ticket.
 
     Unlike the list, this page **does** show contact details — it's the one you
     open deliberately when you need to ring someone about their board.
     """
-    return _render_ticket(request, _require_ticket(store, ref))
+    ticket = _require_ticket(store, ref)
+    return _render_ticket(
+        request, ticket, photos=photo_store.list_photos(ref), photos_failed=photos_failed
+    )
+
+
+@app.post("/tickets/{ref}/photos")
+def upload_ticket_photos(
+    request: Request,
+    ref: str,
+    store: StoreDep,
+    photo_store: PhotoStoreDep,
+    photos: Annotated[list[UploadFile], File()] = [],  # noqa: B006 - FastAPI reads this default
+) -> Response:
+    """Add photos to an existing ticket.
+
+    The realistic flow is "take it in now, photograph it properly once it's on
+    the bench", so this exists alongside upload-at-intake. Requiring the ticket
+    to exist first means a stray ref can't create an orphan photo directory.
+    """
+    _require_ticket(store, ref)
+    failed = _attach_photos(photo_store, ref, photos)
+    suffix = f"?photos_failed={failed}" if failed else ""
+    return RedirectResponse(url=f"/tickets/{ref}{suffix}", status_code=303)
 
 
 @app.post("/tickets/{ref}/status")

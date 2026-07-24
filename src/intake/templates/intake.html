@@ -80,6 +80,15 @@
                   placeholder="Dents, cracks, scuffs — anything you'd want a record of">{{ values.condition_notes }}</textarea>
         <span class="hint">Photos come next, but write down what you can see now.</span>
       </p>
+
+      <p>
+        <label for="photos">Condition photos</label>
+        {# capture="environment" makes a tablet open the rear camera instead of
+           a file browser — the difference between a photo getting taken and not. #}
+        <input type="file" id="photos" name="photos"
+               accept="image/*" capture="environment" multiple />
+        <span class="hint">Dents, cracks, screens — snap what a dispute would hinge on.</span>
+      </p>
     </fieldset>
 
     <p><button type="submit">Create ticket</button></p>

@@ -11,6 +11,13 @@
 
   <p class="ref-instruction">Write this on the tape.</p>
 
+  {% if photos_failed %}
+    <p class="error" role="alert">
+      {{ photos_failed }} photo(s) did not upload — the ticket was still created.
+      Open it to try again.
+    </p>
+  {% endif %}
+
   <dl>
     <dt>Device</dt>
     <dd>{{ ticket.device }}</dd>
