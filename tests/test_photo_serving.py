@@ -131,6 +131,7 @@ def test_a_missing_thumbnail_404s(client) -> None:
 
 def test_photos_are_not_reachable_signed_out(db_path, photo_store) -> None:
     """The whole reason these are app routes and not a static mount."""
+
     # Seed a photo through a signed-in client.
     def _store():
         with connect(db_path) as conn:
