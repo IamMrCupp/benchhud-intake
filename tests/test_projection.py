@@ -59,11 +59,11 @@ def test_ref_device_symptoms_status_pass_through() -> None:
     assert result["status"] == "diagnosing"
 
 
-def test_customer_is_the_name(  ) -> None:
+def test_customer_is_the_name() -> None:
     assert project()["customer"] == "Renata Quist"
 
 
-def test_url_is_a_deep_link(  ) -> None:
+def test_url_is_a_deep_link() -> None:
     assert project()["url"] == "http://repair-bench:8000/tickets/26-0007"
 
 
