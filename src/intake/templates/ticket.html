@@ -28,6 +28,58 @@
     </dl>
   </section>
 
+  <section>
+    <h2>Board</h2>
+
+    <form method="post" action="/tickets/{{ ticket.ref }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <p>
+        <label for="board_id">Board number</label>
+        <input type="text" id="board_id" name="board_id"
+               value="{{ ticket.board_id or '' }}" placeholder="820-00239" />
+      </p>
+      <p><button type="submit">Save board</button></p>
+    </form>
+
+    <h3>Docs</h3>
+    {% if links %}
+      <ul class="doc-links">
+        {% for link in links %}
+          <li>
+            {# Only emit an href for http(s). A user-supplied javascript:/data:
+               URL is rendered as plain text, never as a live link — the label
+               is still shown (Jinja-escaped) so a bad entry is visible. #}
+            {% if link.url.lower().startswith(('http://', 'https://')) %}
+              <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.label }}</a>
+            {% else %}
+              <span class="unsafe">{{ link.label }} — {{ link.url }} (not a usable link)</span>
+            {% endif %}
+            <form method="post" action="/tickets/{{ ticket.ref }}/links/{{ link.id }}/delete"
+                  class="inline-delete">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+              <button type="submit">remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No doc links yet.</p>
+    {% endif %}
+
+    <form method="post" action="/tickets/{{ ticket.ref }}/links">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <p>
+        <label for="link_label">Label</label>
+        <input type="text" id="link_label" name="label" placeholder="Boardview" />
+      </p>
+      <p>
+        <label for="link_url">URL</label>
+        <input type="url" id="link_url" name="url" placeholder="http://…/820-00239.obv" />
+      </p>
+      <p><button type="submit">Add link</button></p>
+    </form>
+  </section>
+
   {# Contact details live here and nowhere else. The list page deliberately
      omits them; this is the page you open on purpose when you need to ring
      someone about their board. #}
