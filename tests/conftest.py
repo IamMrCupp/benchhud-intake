@@ -38,10 +38,13 @@ class CsrfClient(TestClient):
     deliberately wrong one through this client.
     """
 
-    def post(self, url, *, data=None, **kwargs):
-        if isinstance(data, dict) and "csrf_token" not in data:
-            data = {**data, "csrf_token": self._csrf()}
-        return super().post(url, data=data, **kwargs)
+    def post(self, url, *, data=None, files=None, **kwargs):
+        # Inject the token whenever the caller didn't. Covers both plain form
+        # posts and multipart uploads (files present, data omitted) — a browser
+        # carries the hidden field either way.
+        if not (isinstance(data, dict) and "csrf_token" in data):
+            data = {**(data or {}), "csrf_token": self._csrf()}
+        return super().post(url, data=data, files=files, **kwargs)
 
     def _csrf(self) -> str:
         import re
