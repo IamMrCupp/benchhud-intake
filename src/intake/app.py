@@ -9,7 +9,13 @@ from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -518,6 +524,44 @@ def update_ticket_status(
         return _render_ticket(request, ticket, error=str(exc), status_code=400)
 
     return RedirectResponse(url=f"/tickets/{ref}", status_code=303)
+
+
+@app.get("/tickets/{ref}/photos/{name}")
+def serve_photo(ref: str, name: str, store: StoreDep, photo_store: PhotoStoreDep) -> FileResponse:
+    """The full condition photo.
+
+    **Served through the app on purpose.** A static mount on ``uploads/`` would
+    bypass the auth middleware and put pictures of customers' property back on
+    the open LAN — the exact thing Phase 4 closed. This is an ordinary gated
+    route, so deny-by-default covers it like everything else.
+    """
+    return _serve(photo_store.photo_path, store, ref, name)
+
+
+@app.get("/tickets/{ref}/photos/{name}/thumb")
+def serve_thumbnail(
+    ref: str, name: str, store: StoreDep, photo_store: PhotoStoreDep
+) -> FileResponse:
+    """The thumbnail — what the ticket page's gallery renders."""
+    return _serve(photo_store.thumbnail_path, store, ref, name)
+
+
+def _serve(resolver, store: TicketStore, ref: str, name: str) -> FileResponse:
+    """Stream a stored file, or 404.
+
+    Both the ref and the name pass through the store's path guards, which raise
+    on anything that would escape ``uploads/``. A bad ref or a crafted name is a
+    404, never a file from elsewhere on the box.
+    """
+    _require_ticket(store, ref)
+    try:
+        path = resolver(ref, name)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="no such photo") from None
+
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="no such photo")
+    return FileResponse(path)
 
 
 def _require_ticket(store: TicketStore, ref: str) -> Ticket:
