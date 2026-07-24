@@ -81,7 +81,8 @@ def _make_v2_database(path) -> None:
         CREATE TABLE ref_counters (
             year INTEGER PRIMARY KEY, last_counter INTEGER NOT NULL DEFAULT 0
         );
-        INSERT INTO tickets (year, counter, device, customer_name, phone, status, created_at, updated_at)
+        INSERT INTO tickets
+            (year, counter, device, customer_name, phone, status, created_at, updated_at)
             VALUES (26, 1, 'CDJ-3000', 'DJ in LA', '555-0100', 'diagnosing', 'then', 'then');
         PRAGMA user_version = 2;
         """
