@@ -44,14 +44,25 @@ _EDITABLE = frozenset(
         "return_address",
         "accessories",
         "condition_notes",
+        "board_id",
     }
 )
 
 _COLUMNS = (
     "year, counter, device, serial, symptoms, customer_name, phone, email,"
     " return_address, accessories, condition_notes, status, outcome,"
-    " created_at, updated_at"
+    " created_at, updated_at, board_id"
 )
+
+
+@dataclass(frozen=True)
+class TicketLink:
+    """A reference to where a ticket's board docs live — a boardview, a
+    schematic, a source to download from."""
+
+    id: int
+    label: str
+    url: str
 
 
 @dataclass(frozen=True)
@@ -71,6 +82,7 @@ class Ticket:
     return_address: str | None = None
     accessories: str | None = None
     condition_notes: str | None = None
+    board_id: str | None = None
     outcome: Outcome | None = None
 
 
@@ -105,6 +117,7 @@ def _row_to_ticket(row: sqlite3.Row) -> Ticket:
         return_address=row["return_address"],
         accessories=row["accessories"],
         condition_notes=row["condition_notes"],
+        board_id=row["board_id"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -133,6 +146,7 @@ class TicketStore:
         return_address: str | None = None,
         accessories: str | None = None,
         condition_notes: str | None = None,
+        board_id: str | None = None,
     ) -> Ticket:
         """Log a new piece of work and give it a ref."""
         device = (device or "").strip()
@@ -154,7 +168,7 @@ class TicketStore:
         with self.conn:
             self.conn.execute(
                 f"INSERT INTO tickets ({_COLUMNS}) VALUES"
-                " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     self.year,
                     counter,
@@ -171,6 +185,7 @@ class TicketStore:
                     None,
                     stamp,
                     stamp,
+                    _clean(board_id),
                 ),
             )
 
@@ -270,6 +285,49 @@ class TicketStore:
         if ticket is None:
             raise LookupError(f"no such ticket: {ref}")
         return ticket
+
+    # -- doc links ----------------------------------------------------------
+
+    def add_link(self, ref: str, label: str, url: str) -> TicketLink:
+        """Attach a doc reference to a ticket.
+
+        A link needs a URL; the label is convenience — a bare URL is still
+        usable, so an omitted label defaults rather than forcing busywork at the
+        bench.
+        """
+        self._require(ref)
+        url = (url or "").strip()
+        if not url:
+            raise ValueError("a link needs a URL")
+        label = (label or "").strip() or "Link"
+
+        year, counter = parse_ref(ref)
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO ticket_links (year, counter, label, url, created_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (year, counter, label, url, _now()),
+            )
+        return TicketLink(id=cur.lastrowid, label=label, url=url)
+
+    def list_links(self, ref: str) -> list[TicketLink]:
+        """A ticket's doc links, oldest first."""
+        year, counter = parse_ref(ref)
+        rows = self.conn.execute(
+            "SELECT id, label, url FROM ticket_links WHERE year = ? AND counter = ? ORDER BY id",
+            (year, counter),
+        )
+        return [TicketLink(id=r["id"], label=r["label"], url=r["url"]) for r in rows]
+
+    def remove_link(self, ref: str, link_id: int) -> None:
+        """Remove a link. Removing one that isn't there is a no-op, not an error
+        — the caller wanted it gone, and it is."""
+        year, counter = parse_ref(ref)
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM ticket_links WHERE id = ? AND year = ? AND counter = ?",
+                (link_id, year, counter),
+            )
 
     # -- reading ------------------------------------------------------------
 

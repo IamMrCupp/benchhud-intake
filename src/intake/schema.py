@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Duplicated from intake.status, which doesn't exist yet — it lands in B.2 along
 # with the test that asserts these two lists never drift apart. Until then this
@@ -62,6 +62,11 @@ CREATE TABLE IF NOT EXISTS tickets (
     accessories     TEXT,
     condition_notes TEXT,
 
+    -- The board this device is, e.g. "820-00239". Job metadata benchhud will
+    -- resolve boardview/schematic docs against; often unknown until the board
+    -- is opened up, so nullable and usually filled later.
+    board_id        TEXT,
+
     status          TEXT    NOT NULL,
     outcome         TEXT,
 
@@ -104,13 +109,45 @@ CREATE TABLE IF NOT EXISTS ref_counters (
 """
 
 
+# Doc links live in their own table (one ticket, many links) rather than a
+# column, because you often add them over time — a schematic today, a boardview
+# once you've sourced it. Keyed to the ticket by (year, counter), which the
+# tickets table already makes UNIQUE.
+_CREATE_TICKET_LINKS = """
+CREATE TABLE IF NOT EXISTS ticket_links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    year       INTEGER NOT NULL,
+    counter    INTEGER NOT NULL,
+    label      TEXT    NOT NULL,
+    url        TEXT    NOT NULL,
+    created_at TEXT    NOT NULL,
+    FOREIGN KEY (year, counter) REFERENCES tickets (year, counter) ON DELETE CASCADE
+);
+"""
+
+
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    """``ALTER TABLE ADD COLUMN``, but a no-op when the column already exists.
+
+    A fresh database gets the column from ``CREATE TABLE`` and this does nothing;
+    a database upgraded from an older version has the table but not the column,
+    and this adds it without a rebuild — so existing rows are untouched. Checking
+    ``table_info`` rather than catching the duplicate-column error keeps repeated
+    ``initialise()`` calls clean.
+    """
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def initialise(conn: sqlite3.Connection) -> None:
     """Create or upgrade the schema. Safe to call on every startup.
 
-    Every statement is ``IF NOT EXISTS``, so a database already at the current
-    version short-circuits and one at an older version picks up only what it's
-    missing. There is no downgrade path — this is a single-deployment app, and
-    rolling back a schema is a restore-from-backup problem, not a migration one.
+    Base tables use ``IF NOT EXISTS`` (idempotent create); changes to an
+    *existing* table are version-gated ``ALTER``s that no-op when already
+    applied. A database at the current version short-circuits; an older one
+    picks up only what it's missing. No downgrade path — rolling a schema back
+    is a restore-from-backup problem, not a migration one.
     """
     current = conn.execute("PRAGMA user_version").fetchone()[0]
     if current >= SCHEMA_VERSION:
@@ -120,4 +157,11 @@ def initialise(conn: sqlite3.Connection) -> None:
         conn.execute(_CREATE_TICKETS)
         conn.execute(_CREATE_STATUS_INDEX)
         conn.execute(_CREATE_REF_COUNTERS)
+        conn.execute(_CREATE_TICKET_LINKS)
+
+        # v3: board_id on tickets. Fresh databases already have it from
+        # _CREATE_TICKETS; a v2 database gains it here without a rebuild.
+        if current < 3:
+            _add_column_if_missing(conn, "tickets", "board_id", "TEXT")
+
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
