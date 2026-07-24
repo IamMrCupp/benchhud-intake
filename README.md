@@ -14,8 +14,8 @@ they live here instead, and benchhud stores only a reference (`Job.external_ref`
 pointing back. This service is the system of record for customer data; benchhud
 is the bench log.
 
-That split is why this repo is private and proprietary while benchhud is public
-and MIT.
+That split is why this repo is the one holding customer PII, and why it stays
+LAN-only and never gets a public ingress.
 
 ## Running it locally
 
@@ -72,4 +72,10 @@ Two constraints that are easy to get wrong and painful to debug:
 
 ## License
 
-Proprietary — all rights reserved. See [LICENSE](LICENSE).
+Source-available under the [PolyForm Small Business License 1.0.0](https://polyformproject.org/licenses/small-business/1.0.0/)
+— see [LICENSE](LICENSE). Free to use, modify and distribute if your company has
+fewer than 100 people and under $1M in annual revenue, which covers personal use
+and most small shops. Above that, a commercial licence is required — get in touch.
+
+Note this is *source-available*, not open source: the code is readable and
+freely usable within those limits, but it isn't an OSI-approved licence.

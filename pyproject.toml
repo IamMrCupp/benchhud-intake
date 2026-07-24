@@ -4,7 +4,8 @@ dynamic = ["version"]
 description = "Self-hosted repair intake — a tablet-friendly form plus a REST API benchhud consumes as a TicketSource."
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "Proprietary — All Rights Reserved" }
+license = "PolyForm-Small-Business-1.0.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Aaron Cupp" }]
 keywords = ["repair", "intake", "board-repair", "bench", "self-hosted"]
 
