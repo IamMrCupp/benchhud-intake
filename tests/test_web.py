@@ -12,20 +12,14 @@ from intake.app import app
 client = sign_in(CsrfClient(app))
 
 
-def test_index_renders_html() -> None:
-    response = client.get("/")
+def test_index_redirects_to_the_ticket_list() -> None:
+    """The app's home is the ticket list — same place login's `next` falls back
+    to. The Phase 0 placeholder page survived two months past the form it said
+    didn't exist, and the first real sign-in on the deployed cluster saw it."""
+    response = client.get("/", follow_redirects=False)
 
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/html")
-
-
-def test_index_inherits_from_base_layout() -> None:
-    """Content from the child template and chrome from the parent both appear."""
-    body = client.get("/").text
-
-    assert "<!doctype html>" in body.lower()
-    assert "<main>" in body
-    assert "Phase 2" in body
+    assert response.status_code == 303
+    assert response.headers["location"] == "/tickets"
 
 
 def test_viewport_meta_is_present() -> None:
