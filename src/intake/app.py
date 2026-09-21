@@ -237,10 +237,13 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/", response_class=HTMLResponse)
-def index(request: Request) -> HTMLResponse:
-    """Placeholder landing page. The intake form replaces this in Phase 2."""
-    return templates.TemplateResponse(request=request, name="index.html")
+@app.get("/")
+def index() -> RedirectResponse:
+    """Straight to the ticket list — the app's home, same as login's fallback.
+
+    The Phase 0 placeholder that lived here outlasted the phase that was meant
+    to replace it; a signed-in shop app has no use for a lobby."""
+    return RedirectResponse(url="/tickets", status_code=303)
 
 
 def _safe_next(target: str) -> str:
