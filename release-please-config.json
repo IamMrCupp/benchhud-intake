@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "bump-minor-pre-major": false,
+  "bump-patch-for-minor-pre-major": false,
+  "bootstrap-sha": "ca3923e48b7ae7d130a7b470fb28da444ee89748",
+  "packages": {
+    ".": {
+      "package-name": "benchhud-intake",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "src/intake/__init__.py"
+        }
+      ],
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "perf",
+          "section": "Performance"
+        },
+        {
+          "type": "revert",
+          "section": "Reverts"
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Refactors",
+          "hidden": false
+        },
+        {
+          "type": "test",
+          "section": "Tests",
+          "hidden": false
+        },
+        {
+          "type": "build",
+          "section": "Build",
+          "hidden": true
+        },
+        {
+          "type": "ci",
+          "section": "CI",
+          "hidden": false
+        },
+        {
+          "type": "chore",
+          "section": "Chores",
+          "hidden": true
+        }
+      ]
+    }
+  }
+}
