@@ -59,8 +59,27 @@ def test_ref_device_symptoms_status_pass_through() -> None:
     assert result["status"] == "diagnosing"
 
 
-def test_customer_is_the_name() -> None:
-    assert project()["customer"] == "Renata Quist"
+def test_customer_is_the_first_name() -> None:
+    """Only the first name crosses — enough to identify the job at the bench (and
+    for a viewer to recognise their own board in chat) without a full name on the
+    stream. The surname stays behind the deep link."""
+    assert project()["customer"] == "Renata"
+
+
+@pytest.mark.parametrize(
+    ("full", "expected"),
+    [
+        ("Renata Quist", "Renata"),
+        ("Mary Jane Watson", "Mary"),
+        ("Family", "Family"),  # single word passes through
+        ("Jean-Luc Picard", "Jean-Luc"),  # hyphen isn't a split point
+        ("  Padded  Name  ", "Padded"),  # leading/interior whitespace tolerated
+    ],
+)
+def test_customer_is_the_first_whitespace_token(full, expected) -> None:
+    from dataclasses import replace
+
+    assert to_benchhud_ticket(replace(FULL, customer_name=full), BASE)["customer"] == expected
 
 
 def test_url_is_a_deep_link() -> None:
@@ -86,6 +105,7 @@ def test_url_handles_a_base_without_a_trailing_slash() -> None:
         "scuff on lid SECRET",  # condition notes
         "2026-07-23T10:00:00",  # created_at
         "2026-07-23T11:30:00",  # updated_at
+        "Quist",  # surname — first name only crosses the boundary
     ],
 )
 def test_no_pii_of_any_kind_survives(secret) -> None:
@@ -96,11 +116,11 @@ def test_no_pii_of_any_kind_survives(secret) -> None:
     assert secret not in blob, f"leaked into the benchhud projection: {secret!r}"
 
 
-def test_only_the_name_represents_the_customer() -> None:
-    """The name is the *only* customer information that crosses the boundary."""
+def test_only_the_first_name_represents_the_customer() -> None:
+    """The first name is the *only* customer information that crosses the boundary."""
     result = project()
 
-    assert result["customer"] == "Renata Quist"
+    assert result["customer"] == "Renata"
     # And nothing else in the payload references the person beyond that string.
     assert "@" not in json.dumps({k: v for k, v in result.items() if k != "url"})
 
@@ -129,7 +149,7 @@ def test_projection_constructs_a_benchhud_ticket() -> None:
     ticket = _BenchhudTicket(**project())
 
     assert ticket.ref == "26-0007"
-    assert ticket.customer == "Renata Quist"
+    assert ticket.customer == "Renata"
     assert ticket.url.endswith("/tickets/26-0007")
 
 
