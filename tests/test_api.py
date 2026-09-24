@@ -165,7 +165,7 @@ def test_one_ticket_by_ref(seeded) -> None:
     ticket = seeded.get("/api/tickets/26-0001", headers=_auth()).json()
 
     assert ticket["ref"] == "26-0001"
-    assert ticket["customer"] == "Renata Quist"
+    assert ticket["customer"] == "Renata"
     assert ticket["status"] == "diagnosing"
 
 
@@ -195,6 +195,7 @@ def test_the_deep_link_is_present(seeded) -> None:
         "SN-SECRET",
         "charger SECRET",
         "scuff SECRET",
+        "Quist",  # surname — only the first name crosses
     ],
 )
 def test_no_pii_reaches_the_wire(seeded, secret) -> None:
@@ -207,10 +208,10 @@ def test_no_pii_reaches_the_wire(seeded, secret) -> None:
     assert secret not in detail
 
 
-def test_only_the_name_appears(seeded) -> None:
+def test_only_the_first_name_appears(seeded) -> None:
     ticket = seeded.get("/api/tickets/26-0001", headers=_auth()).json()
 
-    assert ticket["customer"] == "Renata Quist"
+    assert ticket["customer"] == "Renata"
     assert "@" not in seeded.get("/api/tickets/26-0001", headers=_auth()).text.replace(
         ticket["url"], ""
     )
