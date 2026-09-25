@@ -1,0 +1,12 @@
+# The database, condition photos and (if used) settings.env. The cluster's
+# default storage class unless your overlay sets storageClassName.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: benchhud-intake-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
