@@ -22,6 +22,9 @@ dependencies = [
     "pillow>=12.3.0",
 ]
 
+[project.scripts]
+benchhud-intake = "intake.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/IamMrCupp/benchhud-intake"
 Issues = "https://github.com/IamMrCupp/benchhud-intake/issues"

@@ -17,6 +17,35 @@ is the bench log.
 That split is why this repo is the one holding customer PII, and why it stays
 LAN-only and never gets a public ingress.
 
+## Installing it as a program
+
+No cluster needed. Install the command with [uv](https://docs.astral.sh/uv/)
+(or pipx), set a password once, and run it:
+
+```bash
+uv tool install git+https://github.com/IamMrCupp/benchhud-intake
+benchhud-intake set-password     # required: it won't serve customer records without one
+benchhud-intake new-token        # optional: the token benchhud's Tickets tab uses
+benchhud-intake serve            # http://127.0.0.1:8000/
+```
+
+`serve` stays on this machine by default. `--host 0.0.0.0` shares it on the LAN
+so a tablet can reach it. It holds customer records, so never on a public network.
+
+Everything lives in one per-user folder. `benchhud-intake paths` shows it:
+
+| OS | Data folder |
+|---|---|
+| macOS | `~/Library/Application Support/benchhud-intake` |
+| Windows | `%APPDATA%\benchhud-intake` |
+| Linux | `$XDG_DATA_HOME/benchhud-intake` (`~/.local/share/…`) |
+
+It holds `intake.db`, `uploads/` and `settings.env`, the owner-only settings
+file that `set-password` and `new-token` write. `--data-dir` or
+`INTAKE_DATA_DIR` points it elsewhere. **Environment variables always win over
+the settings file**, so the container and the cluster deployment below work
+exactly as before.
+
 ## Running it locally
 
 Requires [uv](https://docs.astral.sh/uv/). Python 3.12 is pinned via
