@@ -17,6 +17,28 @@ is the bench log.
 That split is why this repo is the one holding customer PII, and why it stays
 LAN-only and never gets a public ingress.
 
+## The menu-bar app
+
+On a Mac or Windows PC, the easiest way to run intake is the app: it lives in the
+menu bar (macOS) or system tray (Windows), with no window of its own.
+
+- **First launch** asks for a password. intake holds customer records, so it
+  won't serve without one.
+- The menu shows whether it's running and where, with **Open in browser**,
+  **Share on the LAN** (so a tablet can reach it), **Start at login**,
+  **Set password…**, **New API token…** (copied to the clipboard for benchhud's
+  Tickets tab), **Open data folder** and **Quit**.
+- It uses the same data folder and `settings.env` as `benchhud-intake serve`,
+  so you can switch between the two.
+
+CI builds it on every PR: `benchhud-intake-macos` (a zipped `.app`) and
+`benchhud-intake-msi`. Each is launched in a smoke mode that serves and answers
+`/healthz` before the job passes. From a `uv tool` install, run it with
+`benchhud-intake tray` (install the `tray` extra: `'benchhud-intake[tray] @ git+…'`).
+
+To build the app yourself: `uvx briefcase create macOS app && uvx briefcase build macOS app`
+(or `windows`). `scripts/make_icons.py` regenerates the icons.
+
 ## Installing it as a program
 
 No cluster needed. Install the command with [uv](https://docs.astral.sh/uv/)
