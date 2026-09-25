@@ -85,9 +85,14 @@ refuses to schedule.
 
 ## Deployment
 
-Manifests are **not** in this repo. They live in `cluster-management` (Flux
-GitOps) alongside the other apps on the cluster, following the same pattern as
-`apps/recipe-box`. Merging to `main` here pushes
+**To run it on your own Kubernetes**, use the kustomize base in
+[`deploy/kubernetes/`](deploy/kubernetes/README.md) from an overlay. It sets the
+two things that must not change (one replica, Recreate) and leaves namespace,
+storage and exposure to you.
+
+The maintainer's own cluster runs from `cluster-management` (Flux GitOps),
+alongside the other apps, following the same pattern as `apps/recipe-box`.
+Merging to `main` here pushes
 `ghcr.io/iammrcupp/benchhud-intake:latest`; Flux picks up the new digest and
 rolls it out.
 
