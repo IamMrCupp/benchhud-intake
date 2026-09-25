@@ -1,0 +1,13 @@
+# ClusterIP by default. This service holds customer records: expose it on your
+# LAN (a LoadBalancer IP, or a LAN-only ingress) in an overlay, never publicly.
+apiVersion: v1
+kind: Service
+metadata:
+  name: benchhud-intake
+spec:
+  selector:
+    app: benchhud-intake
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

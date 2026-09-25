@@ -1,0 +1,72 @@
+# ⚠️ replicas MUST stay 1 and strategy MUST stay Recreate, for two reasons,
+# either of which is enough:
+#   1. The store is SQLite: safe with exactly one writer, corruptible with two.
+#   2. The login rate limiter is in-memory and per process: a second replica
+#      would keep its own count and quietly halve the throttle.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: benchhud-intake
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: benchhud-intake
+  template:
+    metadata:
+      labels:
+        app: benchhud-intake
+    spec:
+      containers:
+        - name: benchhud-intake
+          image: ghcr.io/iammrcupp/benchhud-intake
+          ports:
+            - containerPort: 8000
+          env:
+            # The database and photos live on the data volume.
+            - name: INTAKE_DB_PATH
+              value: /data/intake.db
+            - name: INTAKE_UPLOADS_PATH
+              value: /data/uploads
+            # If the volume is NFS, patch this to "1" in your overlay: it selects
+            # journal_mode=TRUNCATE and synchronous=FULL. WAL, the default,
+            # corrupts on NFS rather than erroring.
+            - name: INTAKE_SQLITE_NFS
+              value: "0"
+          envFrom:
+            # INTAKE_PASSWORD_HASH (required), INTAKE_SESSION_SECRET and
+            # INTAKE_API_TOKEN (optional). See secret.example.yaml. The app
+            # refuses to start with no password hash, by design.
+            - secretRef:
+                name: benchhud-intake-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          # /healthz is the one route that answers without a session.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      securityContext:
+        fsGroup: 1000 # the image runs as uid 1000; the volume must be writable
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: benchhud-intake-data
