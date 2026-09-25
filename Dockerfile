@@ -23,9 +23,18 @@ RUN uv sync --frozen --no-dev
 # Non-root. The data PVC is mounted with fsGroup 1000 on the cluster, matching
 # the pattern apps/recipe-box uses.
 RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin intake \
-    && chown -R intake:intake /app
+    && chown -R intake:intake /app \
+    && mkdir /data && chown intake:intake /data
 USER intake
+
+# The data folder: the database, photos and settings.env live here. The cluster
+# and compose both mount their volume at /data. Environment variables still
+# override settings.env, so the cluster's Secret behaves exactly as before.
+ENV INTAKE_DATA_DIR=/data
 
 EXPOSE 8000
 
-CMD ["uvicorn", "intake.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# `serve` rather than uvicorn directly, so a settings.env written by
+# `benchhud-intake set-password` in the volume is read. It refuses to start with
+# no password, as the app always has.
+CMD ["benchhud-intake", "serve", "--host", "0.0.0.0", "--port", "8000"]

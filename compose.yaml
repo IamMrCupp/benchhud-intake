@@ -1,0 +1,23 @@
+# benchhud-intake with Docker Compose (or `podman compose`).
+#
+#   docker compose run --rm intake benchhud-intake set-password   # once
+#   docker compose run --rm intake benchhud-intake new-token      # optional, for benchhud
+#   docker compose up -d                                          # http://127.0.0.1:8000/
+#
+# The password and token land in settings.env inside the volume, read by the
+# app itself, so the $ in the password hash never meets Compose's interpolation.
+
+services:
+  intake:
+    # Pin a release (e.g. :0.3) rather than :latest for a deploy you don't babysit.
+    image: ghcr.io/iammrcupp/benchhud-intake:latest
+    ports:
+      # This machine only. For a tablet on the LAN, use "8000:8000". Never expose
+      # it publicly: it holds customer records.
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - intake-data:/data
+    restart: unless-stopped
+
+volumes:
+  intake-data:
