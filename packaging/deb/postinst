@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    if ! getent passwd benchhud-intake >/dev/null; then
+        useradd --system --user-group --home-dir /var/lib/benchhud-intake \
+            --no-create-home --shell /usr/sbin/nologin benchhud-intake
+    fi
+    install -d -o benchhud-intake -g benchhud-intake -m 0750 /var/lib/benchhud-intake
+fi
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable benchhud-intake.service >/dev/null 2>&1 || true
+    # Restart on upgrade; on a fresh install there's no password yet, and the
+    # service refuses to start without one (by design).
+    if [ -n "$2" ]; then
+        systemctl try-restart benchhud-intake.service >/dev/null 2>&1 || true
+    fi
+fi
+
+if [ -z "$2" ]; then
+    cat <<'MSG'
+
+benchhud-intake is installed. Set a password, then start it:
+
+    sudo benchhud-intake set-password
+    sudo systemctl start benchhud-intake
+
+It listens on 127.0.0.1:8000. For a tablet on your LAN, add INTAKE_HOST=0.0.0.0
+to /var/lib/benchhud-intake/settings.env and restart it. It holds customer
+records: never expose it to the internet.
+
+MSG
+fi
+exit 0
