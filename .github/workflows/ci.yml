@@ -226,8 +226,10 @@ jobs:
 
       - name: apt install the package
         run: |
-          docker cp dist/. sd:/tmp/dist/
-          docker exec sd sh -c 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/dist/*.deb'
+          # Not /tmp: systemd mounts a tmpfs over it, hiding what docker cp puts there.
+          docker exec sd mkdir -p /root/dist
+          docker cp dist/. sd:/root/dist/
+          docker exec sd sh -c 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/dist/*.deb'
 
       - name: It installed a disabled-until-configured service
         run: |
