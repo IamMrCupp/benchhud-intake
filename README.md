@@ -39,6 +39,30 @@ CI builds it on every PR: `benchhud-intake-macos` (a zipped `.app`) and
 To build the app yourself: `uvx briefcase create macOS app && uvx briefcase build macOS app`
 (or `windows`). `scripts/make_icons.py` regenerates the icons.
 
+## On a Linux box, as a service
+
+For a headless bench machine or a Pi: a `.deb` that runs intake under systemd.
+CI builds it for `amd64` and `arm64` on every PR (`benchhud-intake-deb-amd64`,
+`benchhud-intake-deb-arm64`), for Ubuntu 26.04.
+
+```bash
+sudo apt install ./benchhud-intake_<version>_amd64.deb
+sudo benchhud-intake set-password         # it won't start without one
+sudo benchhud-intake new-token            # optional, for benchhud
+sudo systemctl start benchhud-intake      # http://127.0.0.1:8000/
+```
+
+- It runs as its own `benchhud-intake` system user, with its data in
+  `/var/lib/benchhud-intake`, and it's enabled to start at boot.
+- `settings.env` there stays **root-only**. systemd reads it and passes the
+  password and token in, so the service user never can.
+- It listens on loopback. For a tablet, add `INTAKE_HOST=0.0.0.0` to
+  `settings.env` and `sudo systemctl restart benchhud-intake`.
+- With no password it fails once and stays stopped, rather than restarting in
+  a loop. `journalctl -u benchhud-intake` says why.
+- Removing the package keeps the data and the service user: deleting customer
+  records should never be a side effect of `apt remove`.
+
 ## Installing it as a program
 
 No cluster needed. Install the command with [uv](https://docs.astral.sh/uv/)

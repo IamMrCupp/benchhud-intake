@@ -1,0 +1,6 @@
+#!/bin/sh
+# The .deb's command: the same `benchhud-intake`, defaulting to the service's
+# data folder so `sudo benchhud-intake set-password` configures the service.
+: "${INTAKE_DATA_DIR:=/var/lib/benchhud-intake}"
+export INTAKE_DATA_DIR
+exec /opt/benchhud-intake/bin/benchhud-intake "$@"

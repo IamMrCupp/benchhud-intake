@@ -1,0 +1,41 @@
+[Unit]
+Description=benchhud intake (repair intake web app)
+Documentation=https://github.com/IamMrCupp/benchhud-intake
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=benchhud-intake
+Group=benchhud-intake
+# The data folder: the database and photos. systemd creates it, owned by the
+# service user.
+StateDirectory=benchhud-intake
+StateDirectoryMode=0750
+Environment=INTAKE_DATA_DIR=/var/lib/benchhud-intake
+# Loopback unless settings.env says INTAKE_HOST=0.0.0.0 (a tablet on the LAN).
+Environment=INTAKE_HOST=127.0.0.1
+Environment=INTAKE_PORT=8000
+# The password hash and tokens, written by `sudo benchhud-intake set-password`.
+# systemd reads it as root; the file stays root-only. Values win over the lines
+# above.
+EnvironmentFile=-/var/lib/benchhud-intake/settings.env
+ExecStart=/opt/benchhud-intake/bin/benchhud-intake serve --host ${INTAKE_HOST} --port ${INTAKE_PORT}
+Restart=on-failure
+RestartSec=5
+# Exit 2 is "no password set": restarting won't fix that, so don't loop.
+RestartPreventExitStatus=2
+
+# It holds customer records: give it as little of the system as it needs.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
