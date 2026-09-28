@@ -36,6 +36,26 @@ ProtectKernelModules=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
+# No capabilities at all: it binds an unprivileged port as an ordinary user.
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateUsers=yes
+# It only needs TCP (IPv4/6) and local sockets.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+ProcSubset=pid
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# Files it creates (the database, photos) are its own alone.
+UMask=0077
+# Not MemoryDenyWriteExecute: libffi's callback trampolines need W+X pages, and
+# that breaks at runtime in ways a quick health check wouldn't catch.
 
 [Install]
 WantedBy=multi-user.target

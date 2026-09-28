@@ -263,3 +263,4 @@ jobs:
           ' || { docker exec sd journalctl -u benchhud-intake --no-pager | tail -30; exit 1; }
           docker exec sd systemctl status benchhud-intake --no-pager | head -12
           docker exec sd systemd-analyze security benchhud-intake --no-pager | tail -1
+          docker exec sd systemd-analyze security benchhud-intake --no-pager | grep -E "✗" || true
