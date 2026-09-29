@@ -8,6 +8,7 @@
   "packages": {
     ".": {
       "package-name": "benchhud-intake",
+      "release-as": "0.2.1",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
