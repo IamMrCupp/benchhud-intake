@@ -29,6 +29,11 @@ the first launch needs right-click → Open.
 gh release download --repo IamMrCupp/benchhud-intake --pattern '*_amd64.deb'
 ```
 
+PRs and merges to `main` build and check only the Linux amd64 packages, since
+macOS and Windows runners bill at 10× and 2×. The macOS, Windows and arm64 builds
+run for every release, by hand, or on a PR labelled `full-ci` (use it on a PR
+that touches packaging). Docs-only changes skip CI.
+
 ## The menu-bar app
 
 On a Mac or Windows PC, the easiest way to run intake is the app: it lives in the
