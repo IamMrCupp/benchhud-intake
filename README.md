@@ -17,6 +17,18 @@ is the bench log.
 That split is why this repo is the one holding customer PII, and why it stays
 LAN-only and never gets a public ingress.
 
+## Downloads
+
+Every [release](https://github.com/IamMrCupp/benchhud-intake/releases) has its installers
+attached: the Linux service `.deb` (amd64 and arm64), the Windows tray-app MSI
+and the macOS tray app. They're built by the same CI jobs every PR runs, at the
+release tag, including the install checks. The macOS app is ad-hoc signed, so
+the first launch needs right-click → Open.
+
+```bash
+gh release download --repo IamMrCupp/benchhud-intake --pattern '*_amd64.deb'
+```
+
 ## The menu-bar app
 
 On a Mac or Windows PC, the easiest way to run intake is the app: it lives in the
