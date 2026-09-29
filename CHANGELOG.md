@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/IamMrCupp/benchhud-intake/compare/v0.2.0...v0.2.1) (2026-09-29)
+
+
+### Documentation
+
+* **readme:** describe the service's systemd sandbox ([d092cda](https://github.com/IamMrCupp/benchhud-intake/commit/d092cda1c822b46f9f320c77ea3d76d537c32cea))
+
 ## [0.2.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.1.0...v0.2.0) (2026-09-26)
 
 
