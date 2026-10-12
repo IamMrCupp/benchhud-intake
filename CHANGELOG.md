@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.2](https://github.com/IamMrCupp/benchhud-intake/compare/v0.2.1...v0.2.2) (2026-10-12)
+
+
+### Bug Fixes
+
+* **release:** download only the installer artifacts, not the image build record ([7040396](https://github.com/IamMrCupp/benchhud-intake/commit/70403962d8ef634bff6183cc226114140e5d69da))
+
+
+### Documentation
+
+* **readme:** the tray apps come from releases, not every PR ([3be700e](https://github.com/IamMrCupp/benchhud-intake/commit/3be700e5d12859c72f9054395a763d809bf866da))
+
 ## [0.2.1](https://github.com/IamMrCupp/benchhud-intake/compare/v0.2.0...v0.2.1) (2026-09-29)
 
 
