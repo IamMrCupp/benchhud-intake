@@ -48,9 +48,11 @@ menu bar (macOS) or system tray (Windows), with no window of its own.
 - It uses the same data folder and `settings.env` as `benchhud-intake serve`,
   so you can switch between the two.
 
-CI builds it on every PR: `benchhud-intake-macos` (a zipped `.app`) and
-`benchhud-intake-msi`. Each is launched in a smoke mode that serves and answers
-`/healthz` before the job passes. From a `uv tool` install, run it with
+Download it from the latest [release](https://github.com/IamMrCupp/benchhud-intake/releases):
+the `.app.zip` (macOS, ad-hoc signed, so right-click → Open the first time) or
+the `.msi` (Windows). Both are built for every release (and on a PR labelled
+`full-ci`), and launched in a smoke mode that serves and answers `/healthz`
+before they're attached. From a `uv tool` install, run it with
 `benchhud-intake tray` (install the `tray` extra: `'benchhud-intake[tray] @ git+…'`).
 
 To build the app yourself: `uvx briefcase create macOS app && uvx briefcase build macOS app`
