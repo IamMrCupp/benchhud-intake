@@ -116,6 +116,15 @@ file that `set-password` and `new-token` write. `--data-dir` or
 the settings file**, so the container and the cluster deployment below work
 exactly as before.
 
+For scripts (such as `bench-setup`), both commands have non-interactive forms
+that keep secrets out of the command line:
+
+```bash
+printf '%s\n' "$PW" | benchhud-intake set-password --stdin   # one line, no confirm
+benchhud-intake set-password --generate   # random password, printed once on stdout
+benchhud-intake new-token --print         # the token alone on stdout
+```
+
 ## Running it locally
 
 Requires [uv](https://docs.astral.sh/uv/). Python 3.12 is pinned via

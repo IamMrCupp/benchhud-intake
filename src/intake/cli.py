@@ -2,6 +2,8 @@
 
     benchhud-intake set-password     # once: the login password (required)
     benchhud-intake new-token        # optional: the API token benchhud uses
+    benchhud-intake set-password --stdin | --generate   # non-interactive
+    benchhud-intake new-token --print                   # token alone on stdout
     benchhud-intake serve            # http://127.0.0.1:8000/
     benchhud-intake paths            # where the data and settings live
 
@@ -58,17 +60,37 @@ def cmd_serve(args: argparse.Namespace, run: Callable[..., None] | None = None) 
     return 0
 
 
+def _read_stdin_line() -> str:
+    """One line from stdin with only its line ending stripped."""
+    line = sys.stdin.readline()
+    return line.removesuffix("\n").removesuffix("\r")
+
+
 def cmd_set_password(args: argparse.Namespace, ask: Callable[[str], str] = getpass.getpass) -> int:
-    password = ask("New intake password: ")
-    if password != ask("Again: "):
-        print("The passwords didn't match.", file=sys.stderr)
-        return 1
+    generated = False
+    if getattr(args, "generate", False):
+        password = secrets.token_urlsafe(18)
+        generated = True
+    elif getattr(args, "stdin", False):
+        password = _read_stdin_line()
+    else:
+        password = ask("New intake password: ")
+        if password != ask("Again: "):
+            print("The passwords didn't match.", file=sys.stderr)
+            return 1
     if not password.strip():
         print("The password can't be blank.", file=sys.stderr)
         return 1
     path = settings.settings_path(_data(args))
     settings.write_setting(path, auth.ENV_VAR, auth.hash_password(password))
-    print(f"Saved to {path}. Restart benchhud-intake if it's running.")
+    saved = f"Saved to {path}. Restart benchhud-intake if it's running."
+    if generated:
+        print(password)  # the only time it's ever shown
+        print(saved, file=sys.stderr)
+    elif getattr(args, "stdin", False):
+        print(saved, file=sys.stderr)  # keep stdout empty for scripts
+    else:
+        print(saved)
     return 0
 
 
@@ -77,11 +99,12 @@ def cmd_new_token(args: argparse.Namespace) -> int:
     path = settings.settings_path(_data(args))
     settings.write_setting(path, auth.API_TOKEN_ENV_VAR, token)
     print(token)
-    print(
-        f"Saved to {path}. Paste it into benchhud: Preferences → Tickets → Token. "
-        "The old token, if any, stops working when benchhud-intake restarts.",
-        file=sys.stderr,
-    )
+    if not getattr(args, "print_only", False):
+        print(
+            f"Saved to {path}. Paste it into benchhud: Preferences → Tickets → Token. "
+            "The old token, if any, stops working when benchhud-intake restarts.",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -120,12 +143,23 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1", help="0.0.0.0 to share on the LAN")
     serve.add_argument("--port", type=int, default=8000)
     serve.set_defaults(func=cmd_serve)
-    sub.add_parser("set-password", help="set the login password").set_defaults(
-        func=cmd_set_password
+    set_password = sub.add_parser("set-password", help="set the login password")
+    source = set_password.add_mutually_exclusive_group()
+    source.add_argument(
+        "--stdin", action="store_true", help="read the password from one line of stdin"
     )
-    sub.add_parser("new-token", help="make the API token benchhud uses").set_defaults(
-        func=cmd_new_token
+    source.add_argument(
+        "--generate", action="store_true", help="make a random password and print it once"
     )
+    set_password.set_defaults(func=cmd_set_password)
+    new_token = sub.add_parser("new-token", help="make the API token benchhud uses")
+    new_token.add_argument(
+        "--print",
+        dest="print_only",
+        action="store_true",
+        help="print only the token on stdout, for scripts",
+    )
+    new_token.set_defaults(func=cmd_new_token)
     sub.add_parser("paths", help="show where data and settings live").set_defaults(func=cmd_paths)
     sub.add_parser("tray", help="run as a menu-bar / tray app").set_defaults(func=cmd_tray)
     return parser
