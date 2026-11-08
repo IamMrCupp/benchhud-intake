@@ -2,7 +2,7 @@
 
     benchhud-intake set-password     # once: the login password (required)
     benchhud-intake new-token        # optional: the API token benchhud uses
-    benchhud-intake serve            # http://127.0.0.1:8000/
+    benchhud-intake serve            # http://127.0.0.1:8401/
     benchhud-intake paths            # where the data and settings live
 
 Everything lands in the per-OS data folder (see :mod:`intake.settings`), and
@@ -118,7 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     serve = sub.add_parser("serve", help="run the web app")
     serve.add_argument("--host", default="127.0.0.1", help="0.0.0.0 to share on the LAN")
-    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--port", type=int, default=8401, help="default 8401")
     serve.set_defaults(func=cmd_serve)
     sub.add_parser("set-password", help="set the login password").set_defaults(
         func=cmd_set_password

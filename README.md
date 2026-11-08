@@ -100,7 +100,7 @@ No cluster needed. Install the command with [uv](https://docs.astral.sh/uv/)
 uv tool install git+https://github.com/IamMrCupp/benchhud-intake
 benchhud-intake set-password     # required: it won't serve customer records without one
 benchhud-intake new-token        # optional: the token benchhud's Tickets tab uses
-benchhud-intake serve            # http://127.0.0.1:8000/
+benchhud-intake serve            # http://127.0.0.1:8401/
 ```
 
 `serve` stays on this machine by default. `--host 0.0.0.0` shares it on the LAN

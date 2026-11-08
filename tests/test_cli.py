@@ -153,3 +153,10 @@ def test_serve_warns_when_shared_on_the_lan(tmp_path, capsys) -> None:
 def test_paths_names_the_settings_file(tmp_path, capsys) -> None:
     assert cli.main(["--data-dir", str(tmp_path), "paths"]) == 0
     assert str(tmp_path / "settings.env") in capsys.readouterr().out
+
+
+def test_serve_defaults_to_port_8401(tmp_path) -> None:
+    """bench-suite's host port for intake: 8401 (parts 8402, recon 8403)."""
+    calls = []
+    cli.cmd_serve(_args(tmp_path, "serve"), run=lambda app, **kw: calls.append(kw))
+    assert calls == [{"host": "127.0.0.1", "port": 8401}]
