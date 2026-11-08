@@ -20,7 +20,7 @@ from fastapi.responses import (
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from intake import auth
+from intake import __version__, auth
 from intake.auth import verify_password
 from intake.db import connect
 from intake.photos import Photo, PhotoError, PhotoStore
@@ -232,9 +232,10 @@ def healthz() -> dict[str, str]:
     This route stays **unauthenticated** when the password gate lands in Phase 4
     — it's what Kubernetes hits, and it must answer before a session exists. It
     is the only documented exception to "all routes protected", so it must never
-    return anything about a ticket or a customer.
+    return anything about a ticket or a customer. The app name and version are
+    public anyway; they let bench-setup confirm what is listening on a port.
     """
-    return {"status": "ok"}
+    return {"status": "ok", "app": "benchhud-intake", "version": __version__}
 
 
 @app.get("/")
