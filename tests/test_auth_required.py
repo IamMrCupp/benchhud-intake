@@ -127,7 +127,8 @@ def test_healthz_answers_without_a_session(client) -> None:
     response = client.get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
+    assert response.json()["app"] == "benchhud-intake"
 
 
 def test_login_page_is_reachable_signed_out(client) -> None:
