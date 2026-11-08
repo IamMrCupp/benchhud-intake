@@ -68,7 +68,7 @@ CI builds it for `amd64` and `arm64` on every PR (`benchhud-intake-deb-amd64`,
 sudo apt install ./benchhud-intake_<version>_amd64.deb
 sudo benchhud-intake set-password         # it won't start without one
 sudo benchhud-intake new-token            # optional, for benchhud
-sudo systemctl start benchhud-intake      # http://127.0.0.1:8000/
+sudo systemctl start benchhud-intake      # http://127.0.0.1:8401/
 ```
 
 - It runs as its own `benchhud-intake` system user, with its data in
@@ -78,6 +78,10 @@ sudo systemctl start benchhud-intake      # http://127.0.0.1:8000/
   no devices, TCP and local sockets only, and systemd's `@system-service`
   syscall set. CI checks `systemd-analyze security` stays at or below **4.0**,
   so it can't quietly loosen.
+- It listens on **8401** (bench-suite gives intake, bench-parts and bench-recon
+  8401–8403 so they can share a host). Older installs keep 8000: the
+  upgrade writes `INTAKE_PORT=8000` into `settings.env` when no port is set
+  there. Change that line and restart to move it.
 - `settings.env` there stays **root-only**. systemd reads it and passes the
   password and token in, so the service user never can.
 - It listens on loopback. For a tablet, add `INTAKE_HOST=0.0.0.0` to
@@ -152,7 +156,7 @@ With Docker Compose (or `podman compose`), using the `compose.yaml` here:
 ```bash
 docker compose run --rm intake benchhud-intake set-password   # once
 docker compose run --rm intake benchhud-intake new-token      # optional, for benchhud
-docker compose up -d                                          # http://127.0.0.1:8000/
+docker compose up -d                                          # http://127.0.0.1:8401/
 ```
 
 The data folder in the image is `/data` (`INTAKE_DATA_DIR`); compose mounts a

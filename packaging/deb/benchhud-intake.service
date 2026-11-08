@@ -14,7 +14,7 @@ StateDirectoryMode=0750
 Environment=INTAKE_DATA_DIR=/var/lib/benchhud-intake
 # Loopback unless settings.env says INTAKE_HOST=0.0.0.0 (a tablet on the LAN).
 Environment=INTAKE_HOST=127.0.0.1
-Environment=INTAKE_PORT=8000
+Environment=INTAKE_PORT=8401
 # The password hash and tokens, written by `sudo benchhud-intake set-password`.
 # systemd reads it as root; the file stays root-only. Values win over the lines
 # above.
