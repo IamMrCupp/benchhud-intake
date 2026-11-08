@@ -39,7 +39,7 @@ class ServerController:
         self._app_factory = app_factory or _import_app
         self._server = None
         self._thread: threading.Thread | None = None
-        self._state = ServerState(running=False, host="127.0.0.1", port=8000)
+        self._state = ServerState(running=False, host="127.0.0.1", port=8401)
 
     @property
     def state(self) -> ServerState:

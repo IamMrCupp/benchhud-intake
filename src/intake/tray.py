@@ -55,6 +55,9 @@ from intake.server import ServerController
 
 HOST_ENV = "INTAKE_HOST"
 PORT_ENV = "INTAKE_PORT"
+#: The host port when INTAKE_PORT is unset. bench-suite gives each service its
+#: own: 8401 intake, 8402 parts, 8403 recon.
+DEFAULT_PORT = 8401
 SMOKE_ENV = "INTAKE_TRAY_SMOKE"
 _LOOPBACK = "127.0.0.1"
 _LAN = "0.0.0.0"
@@ -199,9 +202,9 @@ class IntakeTray:
     @property
     def port(self) -> int:
         try:
-            return int(os.environ.get(PORT_ENV, "8000"))
+            return int(os.environ.get(PORT_ENV, str(DEFAULT_PORT)))
         except ValueError:
-            return 8000
+            return DEFAULT_PORT
 
     def _save(self, key: str, value: str) -> None:
         # The running app reads these from the environment on each request, so

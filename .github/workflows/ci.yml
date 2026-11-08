@@ -284,6 +284,8 @@ jobs:
             test "$(stat -c %U:%a /var/lib/benchhud-intake)" = "benchhud-intake:750"
             test "$(systemctl is-enabled benchhud-intake)" = enabled
             benchhud-intake paths | grep -q "/var/lib/benchhud-intake/settings.env"
+            # A fresh install records the new default port (an upgrade keeps 8000).
+            grep -qx "INTAKE_PORT=8401" /var/lib/benchhud-intake/settings.env
           '
 
       - name: With no password it refuses once and doesn't restart-loop
@@ -302,7 +304,7 @@ jobs:
             test "$(stat -c %U:%a /var/lib/benchhud-intake/settings.env)" = "root:600"
             systemctl reset-failed benchhud-intake
             systemctl start benchhud-intake
-            for _ in $(seq 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 1; done
+            for _ in $(seq 30); do curl -fsS http://127.0.0.1:8401/healthz && break; sleep 1; done
             echo
             pid=$(systemctl show -p MainPID --value benchhud-intake)
             test "$(stat -c %U /proc/$pid)" = benchhud-intake
