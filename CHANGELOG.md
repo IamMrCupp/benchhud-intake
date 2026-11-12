@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.2.2...v0.3.0) (2026-11-08)
+
+
+### Features
+
+* **app:** report app name and version on /healthz ([1e18ea9](https://github.com/IamMrCupp/benchhud-intake/commit/1e18ea9b1175bc22c1af9cd0fcbf926d28c8d1f7))
+* **app:** report app name and version on /healthz ([a35520a](https://github.com/IamMrCupp/benchhud-intake/commit/a35520a8ff7f2de4971f6d678b4f089085813230))
+* **cli:** add set-password --stdin/--generate and new-token --print ([834eb87](https://github.com/IamMrCupp/benchhud-intake/commit/834eb8782bd7dabfc2d5883fbb76eff4ab658de3))
+* **cli:** add set-password --stdin/--generate and new-token --print ([d1b6d2e](https://github.com/IamMrCupp/benchhud-intake/commit/d1b6d2e9cacd0f0dc59be37c96829185f2484e48))
+* **cli:** serve defaults to port 8401 ([62e6b11](https://github.com/IamMrCupp/benchhud-intake/commit/62e6b11e7d20fa25abe9535112071b1bfd9f41e8))
+* **deploy:** move the default host port to 8401, keeping upgraded debs on 8000 ([66a2501](https://github.com/IamMrCupp/benchhud-intake/commit/66a25017feb651b566c4684a2c9e38222d1eca25))
+* **deploy:** move the default host port to 8401, keeping upgraded debs on 8000 ([2cb0967](https://github.com/IamMrCupp/benchhud-intake/commit/2cb09670259f9c78168d192b456c50fa88e12247))
+
 ## [0.2.2](https://github.com/IamMrCupp/benchhud-intake/compare/v0.2.1...v0.2.2) (2026-10-12)
 
 
