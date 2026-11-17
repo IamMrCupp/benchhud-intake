@@ -138,6 +138,29 @@ app.add_middleware(
 # from a container image where cwd is not the repo root.
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
+#: The footer's "Source" link, on every page including the sign-in page.
+#:
+#: AGPL section 13: whoever runs a *modified* copy as a network service has to
+#: offer its users the source. Shipping the link in the stock app means a fork
+#: starts out compliant — it sets ``INTAKE_SOURCE_URL`` to its own repository
+#: and the offer follows the code.
+SOURCE_URL_ENV_VAR = "INTAKE_SOURCE_URL"
+DEFAULT_SOURCE_URL = "https://github.com/IamMrCupp/benchhud-intake"
+LICENSE_NAME = "AGPL-3.0-or-later"
+
+
+def source_url() -> str:
+    """Where this running copy's source lives.
+
+    Read on each request, like the other settings. Anything that isn't an
+    http(s) URL falls back to upstream: the value lands in an ``href``, and a
+    typo shouldn't turn the footer into a dead or scripted link.
+    """
+    value = os.environ.get(SOURCE_URL_ENV_VAR, "").strip()
+    if value.startswith(("https://", "http://")):
+        return value
+    return DEFAULT_SOURCE_URL
+
 
 def _csrf_context(request: Request) -> dict[str, str]:
     """Make ``csrf_token`` available to every template.
@@ -154,6 +177,10 @@ def _csrf_context(request: Request) -> dict[str, str]:
         # login form itself needs one. Keying UI on the token would show a
         # "Sign out" button to someone who has never signed in.
         "authenticated": bool(request.session.get("authenticated")),
+        # The footer. Configuration only — nothing here comes from the database,
+        # so it is safe on the sign-in page.
+        "source_url": source_url(),
+        "license_name": LICENSE_NAME,
     }
 
 

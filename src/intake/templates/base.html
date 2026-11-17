@@ -151,6 +151,22 @@
       .empty { color: var(--muted); }
       .timestamps { color: var(--muted); font-size: 0.85rem; margin-top: 2rem; }
 
+      /* Where the code lives. Small and out of the way, but the link is still
+         a full-height finger target. */
+      footer {
+        max-width: 46rem;
+        margin: 2.5rem auto 0;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      footer a {
+        display: inline-block;
+        min-height: var(--touch);
+        line-height: var(--touch);
+      }
+
       @media (prefers-color-scheme: dark) {
         :root {
           --ink: #e9ecf1; --muted: #9aa3ad; --line: #3a414b;
@@ -175,5 +191,12 @@
     <main>
       {% block content %}{% endblock %}
     </main>
+    {# AGPL section 13: the offer of source, on every page and before sign-in.
+       The link and the licence name only — never anything from a ticket.
+       noreferrer so the address of a ticket page isn't handed to the host. #}
+    <footer>
+      <a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Source</a>
+      · {{ license_name }}
+    </footer>
   </body>
 </html>
