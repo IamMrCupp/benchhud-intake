@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/IamMrCupp/benchhud-intake/compare/v0.4.0...v0.4.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **license:** relicense to AGPL-3.0-or-later ([2b061cd](https://github.com/IamMrCupp/benchhud-intake/commit/2b061cd1da9331d82d66340ec76b84f88c930244))
+
 ## [0.4.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.3.0...v0.4.0) (2026-11-17)
 
 
