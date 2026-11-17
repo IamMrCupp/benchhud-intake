@@ -140,7 +140,8 @@ exactly as before.
 Every page has a **Source** link in the footer, sign-in page included.
 `INTAKE_SOURCE_URL` sets where it points and defaults to this repository. If you
 run a modified copy for other people, point it at your own code — that's the
-offer of source AGPL section 13 asks for.
+offer of source AGPL section 13 asks for. It wants an `http://` or `https://`
+address; anything else is ignored and the link stays on this repository.
 
 For scripts (such as `bench-setup`), both commands have non-interactive forms
 that keep secrets out of the command line:
