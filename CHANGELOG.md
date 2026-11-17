@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.4.1...v0.5.0) (2026-11-17)
+
+
+### Features
+
+* **app:** show a Source link in the footer of every page ([f513a5c](https://github.com/IamMrCupp/benchhud-intake/commit/f513a5cc44732ec1e42d55e6b0e75daf49069f5e))
+
+
+### Documentation
+
+* **readme:** say the source link wants an http(s) address ([f513a5c](https://github.com/IamMrCupp/benchhud-intake/commit/f513a5cc44732ec1e42d55e6b0e75daf49069f5e))
+
 ## [0.4.1](https://github.com/IamMrCupp/benchhud-intake/compare/v0.4.0...v0.4.1) (2026-11-17)
 
 
