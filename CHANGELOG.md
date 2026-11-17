@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.3.0...v0.4.0) (2026-11-17)
+
+
+### Features
+
+* **app:** the packaged app's binary takes the command line's commands ([c87e308](https://github.com/IamMrCupp/benchhud-intake/commit/c87e3086f9bc018372d4cfed00752db0040afbe6))
+
+
+### Bug Fixes
+
+* **app:** a command's output goes to stdout, not the system log ([3cb6bf9](https://github.com/IamMrCupp/benchhud-intake/commit/3cb6bf95eccab9bcef873738f3aefef2c81d54e7))
+
+
+### Documentation
+
+* **readme:** the bench apt repo and bench-suite as a way to install ([750eb32](https://github.com/IamMrCupp/benchhud-intake/commit/750eb32f6ee6df0428d8a0612090b742ea7d28db))
+
 ## [0.3.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.2.2...v0.3.0) (2026-11-08)
 
 
