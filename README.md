@@ -137,6 +137,11 @@ file that `set-password` and `new-token` write. `--data-dir` or
 the settings file**, so the container and the cluster deployment below work
 exactly as before.
 
+Every page has a **Source** link in the footer, sign-in page included.
+`INTAKE_SOURCE_URL` sets where it points and defaults to this repository. If you
+run a modified copy for other people, point it at your own code — that's the
+offer of source AGPL section 13 asks for.
+
 For scripts (such as `bench-setup`), both commands have non-interactive forms
 that keep secrets out of the command line:
 
