@@ -1,5 +1,7 @@
-"""``python -m intake`` (and the packaged app): the menu-bar / tray app."""
+"""``python -m intake`` (and the packaged app): the tray app, or a command."""
 
-from intake.tray import main
+import sys
 
-raise SystemExit(main())
+from intake.entry import main
+
+raise SystemExit(main(sys.argv[1:]))
