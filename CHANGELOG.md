@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.5.0...v0.6.0) (2026-11-22)
+
+
+### Features
+
+* **web:** burnwright look with light, dark and custom themes ([7e86adc](https://github.com/IamMrCupp/benchhud-intake/commit/7e86adc779e36d5d94a9fef1178effaddfd3b29d))
+* **web:** burnwright look with light, dark and custom themes ([171b9be](https://github.com/IamMrCupp/benchhud-intake/commit/171b9bea363d0413a2599ecfa190f324c6914cb3))
+
+
+### Bug Fixes
+
+* **web:** let the intake form submit from a browser ([0895521](https://github.com/IamMrCupp/benchhud-intake/commit/0895521b38f9d3275569bf14a76b7c735a56de00))
+* **web:** let the intake form submit from a browser ([3ebfe3e](https://github.com/IamMrCupp/benchhud-intake/commit/3ebfe3e499877a2f92658d292ed3570635aa4d09))
+
 ## [0.5.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.4.1...v0.5.0) (2026-11-17)
 
 
