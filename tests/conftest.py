@@ -11,6 +11,7 @@ the app unconfigured and get a confusing error a long way from the cause.
 """
 
 import os
+import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,6 +28,15 @@ os.environ.setdefault(COOKIE_SECURE_ENV_VAR, "0")
 # Never read the real themes folder under the developer's home: tests that
 # want themes point this at a tmp_path of their own.
 os.environ.setdefault("INTAKE_THEMES_DIR", os.path.join(os.devnull, "no-themes"))
+# Never the developer's own intake.db either. Most tests override the store or
+# point this at a tmp_path; this catches the ones that do neither, so a test
+# run can't migrate or write to a real database sitting in the checkout.
+os.environ.setdefault(
+    "INTAKE_DB_PATH", os.path.join(tempfile.mkdtemp(prefix="intake-tests-"), "intake.db")
+)
+os.environ.setdefault(
+    "INTAKE_UPLOADS_PATH", os.path.join(tempfile.mkdtemp(prefix="intake-tests-"), "uploads")
+)
 
 
 class CsrfClient(TestClient):

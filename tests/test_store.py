@@ -196,3 +196,21 @@ def test_list_is_newest_first(store) -> None:
     refs = [_create(store).ref for _ in range(3)]
 
     assert [t.ref for t in store.list_tickets()] == list(reversed(refs))
+
+
+def test_a_ticket_can_start_at_another_open_status(store) -> None:
+    ticket = store.create_ticket(
+        device="Board", customer_name="Mail-in", phone="555-0100", status="awaiting_arrival"
+    )
+
+    assert ticket.status == "awaiting_arrival"
+
+
+def test_a_ticket_cannot_be_created_closed_or_with_a_made_up_status(store) -> None:
+    for status in ("closed", "on_fire"):
+        with pytest.raises(ValueError):
+            store.create_ticket(
+                device="Board", customer_name="Walk-in", phone="555-0100", status=status
+            )
+    # And the refusal burned no ref.
+    assert store.create_ticket(device="B", customer_name="W", phone="5").ref.endswith("-0001")

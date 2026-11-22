@@ -29,6 +29,9 @@
           <nav class="app-nav" aria-label="Pages">
             <a href="/intake" {% if here == "/intake" %}aria-current="page"{% endif %}>New intake</a>
             <a href="/tickets" {% if here.startswith("/tickets") %}aria-current="page"{% endif %}>Tickets</a>
+            {# The count is the notification: it's on every page, so a request
+               that arrived overnight is seen wherever the app is opened. #}
+            <a href="/requests" {% if here.startswith("/requests") %}aria-current="page"{% endif %}>Requests{% if pending_requests %} <span class="count" aria-label="{{ pending_requests }} waiting">{{ pending_requests }}</span>{% endif %}</a>
           </nav>
           <form method="post" action="/logout" class="signout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />

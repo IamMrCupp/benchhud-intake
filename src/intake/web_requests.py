@@ -23,8 +23,13 @@ import secrets
 import sqlite3
 from dataclasses import dataclass
 
-from intake.refs import format_ref
-from intake.store import _clean, _now
+from intake.refs import format_ref, parse_ref
+from intake.status import Status
+from intake.store import Ticket, TicketStore, _clean, _now
+
+#: The states a request moves through. It starts pending and ends in one of
+#: the other two; there is no way back.
+STATES = ("pending", "accepted", "dismissed")
 
 #: How the device gets to the bench.
 HANDOFFS = ("drop_off", "mail_in")
@@ -130,6 +135,10 @@ def _storable(value: str) -> bool:
     except UnicodeEncodeError:
         return False
     return True
+
+
+class NotPending(ValueError):
+    """Accepting or dismissing a request that has already been dealt with."""
 
 
 def validate(payload: object) -> dict[str, str | None]:
@@ -313,6 +322,94 @@ class RequestStore:
             raise PendingCapReached
         return public_id, True
 
+    def accept(self, public_id: str, tickets: TicketStore) -> Ticket:
+        """Turn a pending request into a real ticket.
+
+        The ticket is made by ``create_ticket``, the same way the intake form
+        makes one, so this is the moment a ref is allocated and not before.
+
+        **The ticket starts at ``awaiting_arrival``, for drop-off and mail-in
+        alike.** Accepting says "yes, bring it" or "yes, post it"; either way
+        the device isn't on the bench yet. Move it to ``intake`` when it is.
+
+        **The request is left as a stub.** Its name, contact details, device
+        and symptoms are blanked here, because the ticket holds them now and a
+        second copy of a customer's details is one more thing to leak. What
+        stays is the link to the ticket, how it was coming in, and the
+        idempotency key, so a relay retrying late still can't make a duplicate.
+        """
+        request = self._require_pending(public_id)
+
+        # Claim it first, in one statement, so two accepts at once (a double
+        # tap, two people) can't both get through: only one UPDATE finds the
+        # row still pending. The claim parks it as dismissed, because the
+        # table won't hold "accepted" without a ticket to point at. If
+        # anything dies between here and the end, the request is left
+        # dismissed with every detail intact and no ticket made. That can be
+        # read and re-entered by hand; a duplicate ticket with a burned ref
+        # can't be taken back.
+        with self.conn:
+            claimed = self.conn.execute(
+                "UPDATE requests SET state = 'dismissed', resolved_at = ?"
+                " WHERE public_id = ? AND state = 'pending'",
+                (_now(), public_id),
+            ).rowcount
+        if not claimed:
+            raise NotPending("this request was already dealt with")
+
+        try:
+            ticket = tickets.create_ticket(
+                device=request.device or "",
+                symptoms=request.symptoms or "",
+                customer_name=request.customer_name or "",
+                phone=request.phone,
+                email=request.email,
+                return_address=request.return_address,
+                status=Status.AWAITING_ARRIVAL,
+            )
+        except Exception:
+            # No ticket was made, so nothing was decided: put it back.
+            with self.conn:
+                self.conn.execute(
+                    "UPDATE requests SET state = 'pending', resolved_at = NULL WHERE public_id = ?",
+                    (public_id,),
+                )
+            raise
+
+        year, counter = parse_ref(ticket.ref)
+        with self.conn:
+            self.conn.execute(
+                "UPDATE requests SET state = 'accepted', resolved_at = ?,"
+                " ticket_year = ?, ticket_counter = ?,"
+                " customer_name = NULL, phone = NULL, email = NULL, device = NULL,"
+                " symptoms = NULL, return_address = NULL"
+                " WHERE public_id = ?",
+                (_now(), year, counter, public_id),
+            )
+        return ticket
+
+    def dismiss(self, public_id: str) -> WebRequest:
+        """Mark a pending request as not becoming a ticket.
+
+        Its details stay for the retention window, in case it was dismissed by
+        mistake, and are deleted after that.
+        """
+        self._require_pending(public_id)
+        with self.conn:
+            self.conn.execute(
+                "UPDATE requests SET state = 'dismissed', resolved_at = ? WHERE public_id = ?",
+                (_now(), public_id),
+            )
+        return self.get(public_id)  # type: ignore[return-value]
+
+    def _require_pending(self, public_id: str) -> WebRequest:
+        request = self.get(public_id)
+        if request is None:
+            raise LookupError("no such request")
+        if request.state != "pending":
+            raise NotPending(f"this request was already {request.state}")
+        return request
+
     def _id_for_key(self, idempotency_key: str) -> str | None:
         row = self.conn.execute(
             "SELECT public_id FROM requests WHERE idempotency_key = ?", (idempotency_key,)
@@ -334,6 +431,8 @@ class RequestStore:
 
     def list_requests(self, state: str = "pending") -> list[WebRequest]:
         """Requests in one state, oldest first: the one waiting longest is on top."""
+        if state not in STATES:
+            raise ValueError(f"unknown request state: {state}")
         rows = self.conn.execute(
             f"SELECT {_COLUMNS} FROM requests WHERE state = ? ORDER BY id", (state,)
         )

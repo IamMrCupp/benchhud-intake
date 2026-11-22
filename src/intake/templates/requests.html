@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Requests — benchhud-intake{% endblock %}
+{% block heading %}{% if state == "pending" %}Requests waiting{% else %}{{ state | capitalize }} requests{% endif %}{% endblock %}
+
+{% block content %}
+  <p class="hint">
+    Sent in from the public site. A request isn't a ticket and has no ref until
+    you accept it.
+  </p>
+
+  {% if requests %}
+    {# No contact details here, same as the ticket list: this screen gets left
+       open on a bench. They're on the request's own page. #}
+    <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Received</th>
+          {% if state == "accepted" %}
+            <th scope="col">Ticket</th>
+          {% else %}
+            <th scope="col">Device</th>
+            <th scope="col">Customer</th>
+          {% endif %}
+          <th scope="col">Coming by</th>
+          {% if state != "pending" %}<th scope="col">{{ state | capitalize }}</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for req in requests %}
+          <tr>
+            <td><a href="/requests/{{ req.id }}">{{ req.received_at[:16] | replace("T", " ") }}</a></td>
+            {% if state == "accepted" %}
+              <td class="ref"><a href="/tickets/{{ req.ticket_ref }}">{{ req.ticket_ref }}</a></td>
+            {% else %}
+              <td>{{ req.device }}</td>
+              <td>{{ req.customer_name }}</td>
+            {% endif %}
+            <td><span class="pill">{{ req.handoff | replace("_", "-") }}</span></td>
+            {% if state != "pending" %}<td>{{ (req.resolved_at or "")[:10] }}</td>{% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <p class="empty">
+      {% if state == "pending" %}
+        No requests waiting.
+      {% else %}
+        No {{ state }} requests.
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <p class="filters">
+    {% for name in all_states %}
+      {% if not loop.first %}&middot;{% endif %}
+      {% if state == name %}
+        <strong>{{ name }}</strong>
+      {% else %}
+        <a href="/requests{% if name != 'pending' %}?state={{ name }}{% endif %}">{{ name }}</a>
+      {% endif %}
+    {% endfor %}
+  </p>
+{% endblock %}

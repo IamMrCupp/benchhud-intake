@@ -315,6 +315,21 @@ button.danger:hover { background: var(--bw-danger-soft); }
 }
 .pill.closed { background: var(--bw-control-hover); color: var(--bw-muted); }
 
+/* How many web requests are waiting, beside "Requests" in the nav. */
+.app-nav .count {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: var(--bw-danger);
+  color: var(--bw-bg);
+  font-size: 0.8em;
+  font-weight: 600;
+  text-align: center;
+}
+dd.long-text { white-space: pre-line; }
+.request-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
 /* The whole point of the confirmation page. This gets read across a bench
    and copied onto a strip of tape. */
 .ref-display {
