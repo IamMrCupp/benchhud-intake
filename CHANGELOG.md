@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.7.0...v0.8.0) (2026-11-22)
+
+
+### Features
+
+* **web:** review web requests with accept and dismiss ([#135](https://github.com/IamMrCupp/benchhud-intake/issues/135)) ([e59fd04](https://github.com/IamMrCupp/benchhud-intake/commit/e59fd04dca50ac33312e6c8d08474a1f88cdcf4e))
+
 ## [0.7.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.6.0...v0.7.0) (2026-11-22)
 
 
