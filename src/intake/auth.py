@@ -116,6 +116,20 @@ def session_secret() -> str:
 API_TOKEN_ENV_VAR = "INTAKE_API_TOKEN"
 
 
+def _bearer_matches(env_var: str, authorization: str | None) -> bool:
+    """Whether an ``Authorization: Bearer <token>`` header carries the token
+    configured in ``env_var``. An unset token matches nothing."""
+    configured = os.environ.get(env_var, "").strip()
+    if not configured or not authorization:
+        return False
+
+    scheme, _, presented = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not presented:
+        return False
+
+    return hmac.compare_digest(presented, configured)
+
+
 def valid_api_token(authorization: str | None) -> bool:
     """Check an ``Authorization: Bearer <token>`` header against the configured
     API token.
@@ -127,15 +141,30 @@ def valid_api_token(authorization: str | None) -> bool:
     password its absence doesn't stop startup — it just means the API is only
     reachable with a session.
     """
-    configured = os.environ.get(API_TOKEN_ENV_VAR, "").strip()
-    if not configured or not authorization:
-        return False
+    return _bearer_matches(API_TOKEN_ENV_VAR, authorization)
 
-    scheme, _, presented = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not presented:
-        return False
 
-    return hmac.compare_digest(presented, configured)
+SUBMIT_TOKEN_ENV_VAR = "INTAKE_SUBMIT_TOKEN"
+
+
+def valid_submit_token(authorization: str | None) -> bool:
+    """Check a bearer header against the submit token, the one the public
+    site's relay holds.
+
+    **Write-only, and a different secret from the API token on purpose.** The
+    relay is the one part of this that faces the internet. Its token opens
+    ``POST /api/requests`` and nothing else, so a relay that is broken into can
+    add requests to a queue someone reviews, and cannot read a single customer
+    record. The middleware in ``intake.app`` is what holds it to that route.
+
+    **Fails closed**, like the API token: unset means no request gets in. It
+    also refuses when the two tokens were set to the same value, because that
+    one string would then read the ticket API and the split would mean nothing.
+    """
+    submit = os.environ.get(SUBMIT_TOKEN_ENV_VAR, "").strip()
+    if submit and hmac.compare_digest(submit, os.environ.get(API_TOKEN_ENV_VAR, "").strip()):
+        return False
+    return _bearer_matches(SUBMIT_TOKEN_ENV_VAR, authorization)
 
 
 def cookie_secure() -> bool:

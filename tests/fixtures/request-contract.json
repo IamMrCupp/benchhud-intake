@@ -1,0 +1,561 @@
+{
+  "contract": "benchhud-intake repair-request API",
+  "version": 1,
+  "about": "The contract between benchhud-intake and the public site's relay. Pinned by tests/test_request_contract.py, which replays every example here against the real endpoint. Copy this file; don't guess. All names, addresses and numbers are made up.",
+  "endpoint": {
+    "method": "POST",
+    "path": "/api/requests"
+  },
+  "headers": {
+    "Authorization": {
+      "required": true,
+      "format": "Bearer <token>",
+      "token": "INTAKE_SUBMIT_TOKEN, from `benchhud-intake new-submit-token`. Authorizes this route only."
+    },
+    "Content-Type": {
+      "required": true,
+      "value": "application/json",
+      "note": "A charset parameter is allowed. The body is UTF-8."
+    },
+    "Idempotency-Key": {
+      "required": false,
+      "max_length": 200,
+      "note": "Any string the relay makes up per form submission. A repeat with the same key returns the first request's 202 and id and stores nothing new, whatever the body says. Keys are remembered for as long as the request row lives."
+    }
+  },
+  "max_body_bytes": 16384,
+  "body": "One JSON object. Strings only. Surrounding whitespace is stripped, and a blank or null value counts as absent. Lengths are counted in characters after stripping.",
+  "fields": {
+    "customer_name": {
+      "required": true,
+      "max_length": 120
+    },
+    "email": {
+      "required": false,
+      "max_length": 254,
+      "note": "At least one of email and phone."
+    },
+    "phone": {
+      "required": false,
+      "max_length": 40,
+      "note": "At least one of email and phone."
+    },
+    "device": {
+      "required": true,
+      "max_length": 200
+    },
+    "symptoms": {
+      "required": true,
+      "max_length": 4000
+    },
+    "handoff": {
+      "required": true,
+      "values": [
+        "drop_off",
+        "mail_in"
+      ]
+    },
+    "return_address": {
+      "required": false,
+      "max_length": 500,
+      "note": "Only meaningful for mail_in. Accepted and kept either way."
+    }
+  },
+  "at_least_one_of": [
+    [
+      "email",
+      "phone"
+    ]
+  ],
+  "unknown_fields": "rejected",
+  "responses": {
+    "202": {
+      "body": {
+        "id": "<opaque>"
+      },
+      "id_pattern": "^[A-Za-z0-9_-]{16,64}$",
+      "note": "Stored as a pending request. The id is opaque: not a ticket ref, no order, no count. Nothing that was sent is echoed."
+    },
+    "400": {
+      "body": {
+        "detail": "invalid request",
+        "errors": [
+          {
+            "field": "<field>",
+            "code": "<code>"
+          }
+        ]
+      },
+      "note": "Every problem is listed, in the field order above. Fields and codes only, never values."
+    },
+    "401": {
+      "body": {
+        "detail": "unauthorized"
+      },
+      "note": "Missing or wrong submit token, or no submit token configured on intake."
+    },
+    "413": {
+      "body": {
+        "detail": "payload too large"
+      },
+      "note": "Body over max_body_bytes."
+    },
+    "415": {
+      "body": {
+        "detail": "unsupported media type"
+      },
+      "note": "Content-Type is not application/json."
+    },
+    "429": {
+      "body": {
+        "detail": "too many pending requests"
+      },
+      "note": "The pending cap is reached (default 200, INTAKE_MAX_PENDING_REQUESTS). Nothing was stored. Show the fallback; a retry only works once someone has reviewed the queue."
+    }
+  },
+  "error_codes": {
+    "required": "A required field is missing or blank.",
+    "one_required": "Neither email nor phone was given. Reported on both.",
+    "too_long": "Over the field's max_length (or the Idempotency-Key's).",
+    "invalid": "Not a string, or not one of the allowed values.",
+    "invalid_json": "field is \"body\": the body is not a JSON object.",
+    "unknown_field": "field is \"body\": the object has a key this contract doesn't list. The key is not named."
+  },
+  "error_fields": [
+    "customer_name",
+    "email",
+    "phone",
+    "device",
+    "symptoms",
+    "handoff",
+    "return_address",
+    "body",
+    "Idempotency-Key"
+  ],
+  "test_token": "contract-fixture-token-not-a-real-one",
+  "examples": [
+    {
+      "name": "accepted-full",
+      "why": "Every field, mail-in.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "phone": "555-0100",
+          "device": "Pioneer DJM-900NXS2",
+          "symptoms": "Channel 2 cuts out when the fader moves.",
+          "handoff": "mail_in",
+          "return_address": "1 Example Street\nSpringfield"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "id": "<opaque>"
+        }
+      }
+    },
+    {
+      "name": "accepted-minimal",
+      "why": "Only what is required, with email as the contact.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "id": "<opaque>"
+        }
+      }
+    },
+    {
+      "name": "accepted-phone-only",
+      "why": "Phone alone satisfies the contact rule. Blank and null count as absent.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off",
+          "phone": " 555-0100 ",
+          "return_address": null
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "id": "<opaque>"
+        }
+      }
+    },
+    {
+      "name": "accepted-idempotent-retry",
+      "why": "Sent twice with the same key: both answers are the same 202 and id, and one request is stored.",
+      "given": {
+        "send_twice": true
+      },
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json",
+          "Idempotency-Key": "3f0c2f3e-6a55-4c0e-9d1b-0d3a5b7c9e11"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 202,
+        "body": {
+          "id": "<opaque>"
+        }
+      }
+    },
+    {
+      "name": "invalid-missing-required",
+      "why": "Blank counts as missing. Every error comes back at once.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "  ",
+          "email": "sam@example.com"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "customer_name",
+              "code": "required"
+            },
+            {
+              "field": "device",
+              "code": "required"
+            },
+            {
+              "field": "symptoms",
+              "code": "required"
+            },
+            {
+              "field": "handoff",
+              "code": "required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-no-contact",
+      "why": "Neither email nor phone.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "email",
+              "code": "one_required"
+            },
+            {
+              "field": "phone",
+              "code": "one_required"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-handoff",
+      "why": "A handoff value outside the two allowed.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "courier"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "handoff",
+              "code": "invalid"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-not-a-string",
+      "why": "A number where text belongs.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off",
+          "phone": 5550100
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "phone",
+              "code": "invalid"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-unknown-field",
+      "why": "A key the contract doesn't list. It is not named in the answer.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off",
+          "website": "https://example.com"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "body",
+              "code": "unknown_field"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-not-an-object",
+      "why": "Valid JSON, but not an object.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": [
+          "not",
+          "an",
+          "object"
+        ]
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "body",
+              "code": "invalid_json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-not-json",
+      "why": "A body that doesn't parse.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "raw": "customer_name=Sam"
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "body",
+              "code": "invalid_json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "unauthorized-no-token",
+      "why": "No Authorization header.",
+      "request": {
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "detail": "unauthorized"
+        }
+      }
+    },
+    {
+      "name": "unauthorized-wrong-token",
+      "why": "A token that isn't the submit token.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer some-other-token",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "detail": "unauthorized"
+        }
+      }
+    },
+    {
+      "name": "unauthorized-token-not-configured",
+      "why": "intake has no INTAKE_SUBMIT_TOKEN set: it fails closed, even for the right-looking header.",
+      "given": {
+        "submit_token_configured": false
+      },
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "detail": "unauthorized"
+        }
+      }
+    },
+    {
+      "name": "unsupported-media-type",
+      "why": "A form-encoded body. The relay must translate the form to JSON.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "raw": "customer_name=Sam"
+      },
+      "response": {
+        "status": 415,
+        "body": {
+          "detail": "unsupported media type"
+        }
+      }
+    },
+    {
+      "name": "pending-cap-reached",
+      "why": "The queue of unreviewed requests is full.",
+      "given": {
+        "max_pending": 0
+      },
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "email": "sam@example.com",
+          "device": "Game Boy Advance",
+          "symptoms": "No sound from the speaker.",
+          "handoff": "drop_off"
+        }
+      },
+      "response": {
+        "status": 429,
+        "body": {
+          "detail": "too many pending requests"
+        }
+      }
+    }
+  ]
+}

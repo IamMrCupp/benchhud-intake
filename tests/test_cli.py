@@ -230,3 +230,34 @@ def test_new_token_print_writes_and_prints_only_the_token(tmp_path, capsys) -> N
 def test_new_token_without_print_keeps_its_hint(tmp_path, capsys) -> None:
     assert cli.main(["--data-dir", str(tmp_path), "new-token"]) == 0
     assert "Preferences" in capsys.readouterr().err
+
+
+def test_new_submit_token_is_saved_under_its_own_name(tmp_path, capsys) -> None:
+    assert cli.main(["--data-dir", str(tmp_path), "new-submit-token"]) == 0
+    out, err = capsys.readouterr()
+    token = out.strip()
+    saved = settings.read_settings(tmp_path / "settings.env")
+    assert len(token) >= 40
+    assert saved[auth.SUBMIT_TOKEN_ENV_VAR] == token
+    assert auth.API_TOKEN_ENV_VAR not in saved
+    assert "relay" in err and token not in err
+
+
+def test_new_submit_token_print_prints_only_the_token(tmp_path, capsys) -> None:
+    assert cli.main(["--data-dir", str(tmp_path), "new-submit-token", "--print"]) == 0
+    out, err = capsys.readouterr()
+    assert out.count("\n") == 1 and err == ""
+    assert settings.read_settings(tmp_path / "settings.env")[auth.SUBMIT_TOKEN_ENV_VAR] == (
+        out.strip()
+    )
+
+
+def test_the_two_tokens_are_separate_secrets(tmp_path, capsys) -> None:
+    cli.main(["--data-dir", str(tmp_path), "new-token", "--print"])
+    api = capsys.readouterr().out.strip()
+    cli.main(["--data-dir", str(tmp_path), "new-submit-token", "--print"])
+    submit = capsys.readouterr().out.strip()
+    saved = settings.read_settings(tmp_path / "settings.env")
+    assert api != submit
+    assert saved[auth.API_TOKEN_ENV_VAR] == api  # making one leaves the other alone
+    assert saved[auth.SUBMIT_TOKEN_ENV_VAR] == submit

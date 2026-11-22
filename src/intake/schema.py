@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Duplicated from intake.status, which doesn't exist yet — it lands in B.2 along
 # with the test that asserts these two lists never drift apart. Until then this
@@ -125,6 +125,68 @@ CREATE TABLE IF NOT EXISTS ticket_links (
 );
 """
 
+# Repair requests from the public site. **A request is not a ticket yet**, and
+# the separation is the point: a ref is a counter that only climbs and gets
+# written on tape, so nothing a stranger can submit may allocate one, and the
+# bench queue benchhud polls (``/api/tickets``) reads ``tickets`` alone. A
+# request gets a ref only when someone at the bench accepts it.
+#
+# ``public_id`` is the opaque handle the relay gets back. It carries no order
+# and no count, unlike the rowid. ``idempotency_key`` is whatever the relay
+# sent in its ``Idempotency-Key`` header; UNIQUE, so a retried POST finds the
+# first row instead of making a second.
+#
+# An accepted request is a **stub**: the ticket holds the customer's details
+# from then on, so the copy here is blanked and only the link to the ticket
+# stays. That is why the detail columns are nullable and the "is it complete"
+# rule is a CHECK that lets accepted rows off.
+_CREATE_REQUESTS = """
+CREATE TABLE IF NOT EXISTS requests (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    public_id       TEXT    NOT NULL UNIQUE,
+    idempotency_key TEXT    UNIQUE,
+
+    customer_name   TEXT,
+    phone           TEXT,
+    email           TEXT,
+    device          TEXT,
+    symptoms        TEXT,
+    handoff         TEXT    NOT NULL,
+    return_address  TEXT,
+
+    state           TEXT    NOT NULL DEFAULT 'pending',
+    received_at     TEXT    NOT NULL,
+    -- When it was accepted or dismissed. The retention clock starts here.
+    resolved_at     TEXT,
+
+    -- The ticket an accepted request became. Not a foreign key: the stub is a
+    -- note about where the request went, and must not block anything on tickets.
+    ticket_year     INTEGER,
+    ticket_counter  INTEGER,
+
+    CONSTRAINT known_state   CHECK (state IN ('pending', 'accepted', 'dismissed')),
+    CONSTRAINT known_handoff CHECK (handoff IN ('drop_off', 'mail_in')),
+
+    -- Same rule as tickets (name, device, a way to reach them), plus symptoms.
+    -- Held for every row that still carries its details.
+    CONSTRAINT complete_unless_accepted CHECK (
+        state = 'accepted' OR (
+            customer_name IS NOT NULL AND device IS NOT NULL
+            AND symptoms IS NOT NULL
+            AND (phone IS NOT NULL OR email IS NOT NULL)
+        )
+    ),
+
+    CONSTRAINT resolved_iff_not_pending
+        CHECK ((state = 'pending') = (resolved_at IS NULL)),
+    CONSTRAINT ticket_iff_accepted
+        CHECK ((state = 'accepted') = (ticket_year IS NOT NULL AND ticket_counter IS NOT NULL))
+);
+"""
+
+# The pending count is read for the cap on every submission.
+_CREATE_REQUESTS_STATE_INDEX = "CREATE INDEX IF NOT EXISTS idx_requests_state ON requests (state);"
+
 
 def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
     """``ALTER TABLE ADD COLUMN``, but a no-op when the column already exists.
@@ -158,6 +220,10 @@ def initialise(conn: sqlite3.Connection) -> None:
         conn.execute(_CREATE_STATUS_INDEX)
         conn.execute(_CREATE_REF_COUNTERS)
         conn.execute(_CREATE_TICKET_LINKS)
+        # v4: the requests table. A new table, so IF NOT EXISTS is the whole
+        # migration: a v3 database gains it here and its tickets are untouched.
+        conn.execute(_CREATE_REQUESTS)
+        conn.execute(_CREATE_REQUESTS_STATE_INDEX)
 
         # v3: board_id on tickets. Fresh databases already have it from
         # _CREATE_TICKETS; a v2 database gains it here without a rebuild.
