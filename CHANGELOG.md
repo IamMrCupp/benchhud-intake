@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.9.0...v0.10.0) (2026-11-22)
+
+
+### Features
+
+* **requests:** ping a webhook when a request comes in ([#135](https://github.com/IamMrCupp/benchhud-intake/issues/135)) ([c52d74e](https://github.com/IamMrCupp/benchhud-intake/commit/c52d74e04bcfb20de4caf82256a1ba16e60d7fe4))
+
 ## [0.9.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.8.0...v0.9.0) (2026-11-22)
 
 
