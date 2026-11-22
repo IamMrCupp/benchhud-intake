@@ -22,6 +22,7 @@ import os
 import secrets
 import sqlite3
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from intake.refs import format_ref, parse_ref
 from intake.status import Status
@@ -89,6 +90,25 @@ def max_pending() -> int:
 
 #: Every code an error can carry. The contract fixture lists the same set.
 ERROR_CODES = ("required", "one_required", "too_long", "invalid", "invalid_json", "unknown_field")
+
+RETENTION_ENV_VAR = "INTAKE_REQUEST_RETENTION_DAYS"
+DEFAULT_RETENTION_DAYS = 30
+
+
+def retention_days() -> int:
+    """How many days a dealt-with request is kept before it is deleted.
+
+    A dismissed request is the name and contact details of someone who never
+    became a customer; it shouldn't sit here forever. Anything that isn't a
+    whole number of zero or more falls back to the default rather than to
+    "keep forever".
+    """
+    raw = os.environ.get(RETENTION_ENV_VAR, "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_RETENTION_DAYS
+    return value if value >= 0 else DEFAULT_RETENTION_DAYS
 
 
 @dataclass(frozen=True)
@@ -401,6 +421,28 @@ class RequestStore:
                 (_now(), public_id),
             )
         return self.get(public_id)  # type: ignore[return-value]
+
+    def purge(self, *, days: int | None = None, now: datetime | None = None) -> int:
+        """Delete requests dealt with more than ``days`` ago. Returns how many.
+
+        Dismissed requests go with everything they carried. Accepted stubs go
+        too: they hold no customer details by then, only the link to a ticket,
+        and the ticket doesn't need it. **Pending requests are never purged**,
+        however old. Nobody has looked at those yet.
+
+        There's no scheduler in this app, so this runs when the app is used
+        (see the callers). It looks before it deletes, because a DELETE takes
+        the write lock even when it matches nothing, and this is called often.
+        """
+        days = retention_days() if days is None else days
+        moment = now if now is not None else datetime.now(UTC)
+        cutoff = (moment - timedelta(days=days)).replace(microsecond=0).isoformat()
+
+        due = "state != 'pending' AND resolved_at < ?"
+        if self.conn.execute(f"SELECT 1 FROM requests WHERE {due} LIMIT 1", (cutoff,)).fetchone():
+            with self.conn:
+                return self.conn.execute(f"DELETE FROM requests WHERE {due}", (cutoff,)).rowcount
+        return 0
 
     def _require_pending(self, public_id: str) -> WebRequest:
         request = self.get(public_id)

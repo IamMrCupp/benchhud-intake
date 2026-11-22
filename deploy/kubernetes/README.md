@@ -57,7 +57,11 @@ Then `kubectl apply -k overlays/bench`.
   and the login rate limiter lives in one process's memory.
 - **`INTAKE_SQLITE_NFS=1` on NFS.** The default WAL journal corrupts on NFS
   instead of failing.
-- **No public exposure.** This service holds customer records.
+- **No public exposure.** This service holds customer records. A public
+  request form doesn't change that: its relay reaches `POST /api/requests`
+  through the ClusterIP Service, with `INTAKE_SUBMIT_TOKEN`. If your cluster
+  enforces NetworkPolicies, let the relay's pods reach this Service and
+  nothing else public-facing.
 
 Backups aren't in the base. SQLite's `.backup` from a CronJob to a second
 volume is the pattern the maintainer's cluster uses.

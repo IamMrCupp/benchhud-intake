@@ -216,6 +216,8 @@ def _pending_requests(request: Request) -> int:
     On every page, so a request that came in overnight is seen wherever the
     app is opened. Only for someone signed in: the sign-in page must not say
     anything about what is in the database, not even a number.
+
+    Also where old dismissed and accepted requests get deleted; see below.
     """
     if not request.session.get("authenticated"):
         return 0
@@ -223,7 +225,13 @@ def _pending_requests(request: Request) -> int:
     # count can never come from a different database than the page beside it.
     provider = request.app.dependency_overrides.get(get_store, get_store)
     with contextmanager(provider)() as store:
-        return RequestStore(store.conn).count_pending()
+        requests = RequestStore(store.conn)
+        # The retention purge rides along here. This app has no scheduler, and
+        # this is the one thing that runs whenever anyone uses it, so a
+        # dismissed request is gone the first time a page loads after its
+        # window ends.
+        requests.purge()
+        return requests.count_pending()
 
 
 def _theme_context() -> dict:
@@ -578,7 +586,12 @@ def request_list(
     return templates.TemplateResponse(
         request=request,
         name="requests.html",
-        context={"requests": found, "state": state, "all_states": web_requests.STATES},
+        context={
+            "requests": found,
+            "state": state,
+            "all_states": web_requests.STATES,
+            "retention_days": web_requests.retention_days(),
+        },
     )
 
 
@@ -588,7 +601,7 @@ def _render_request(
     return templates.TemplateResponse(
         request=request,
         name="request.html",
-        context={"req": found, "error": error},
+        context={"req": found, "error": error, "retention_days": web_requests.retention_days()},
         status_code=status_code,
     )
 
@@ -894,9 +907,14 @@ async def api_submit_request(request: Request, requests: RequestStoreDep) -> JSO
     except InvalidSubmission as exc:
         return _invalid(exc.errors)
 
-    # Off the event loop, like every other route's database work: this is the
-    # one async endpoint (it reads its own body), and a slow write on NFS must
-    # not stall /healthz.
+    # Before the insert, so requests past their window don't linger just
+    # because nobody has opened the app.
+    #
+    # Both off the event loop, like every other route's database work: this is
+    # the one async endpoint (it reads its own body), and a slow write on NFS
+    # must not stall /healthz.
+    await run_in_threadpool(requests.purge)
+
     try:
         public_id, _created = await run_in_threadpool(requests.submit, fields, idempotency_key=key)
     except PendingCapReached:

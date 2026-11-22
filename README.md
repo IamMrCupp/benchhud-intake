@@ -17,6 +17,12 @@ is the bench log.
 That split is why this repo is the one holding customer PII, and why it stays
 LAN-only and never gets a public ingress.
 
+**That still holds now that the public site has a request form.** Requests come
+in through a write-only API over the private network: a relay on the site's
+side forwards them, with a token that can add a request and read nothing.
+Nothing in this service is reachable from the internet, and nothing new is
+readable by the thing that is. The next section has the details.
+
 ## Repair requests from the public site
 
 The shop's public site has a "request a repair" form. The request lands here,
@@ -52,6 +58,26 @@ Two backstops don't depend on the relay behaving. Past
 answers `429` and stores nothing. And a relay that sends an `Idempotency-Key`
 header can retry safely: the same key gets the same answer and no second
 request.
+
+### Reviewing them
+
+Signed in, **Requests** sits next to Tickets, with a count beside it whenever
+something is waiting. Each request has two buttons:
+
+- **Accept** makes a real ticket and takes you to it. This is when the ref is
+  allocated, so junk can't burn `YY-NNNN` numbers. The ticket starts at
+  `awaiting_arrival`, for drop-off and mail-in alike: saying yes doesn't put
+  the device on the bench. The request keeps a note of which ticket it became
+  and drops its own copy of the customer's details.
+- **Dismiss** sets it aside. No ticket, no ref.
+
+Dismissed requests are the details of people who never became customers, so
+they don't stay. Thirty days after a request is dismissed (or accepted) it's
+deleted; `INTAKE_REQUEST_RETENTION_DAYS` changes the window. There's no
+scheduler: the purge runs when a signed-in page loads or a new request
+arrives. A request that's still waiting is never purged.
+
+### The contract
 
 **The contract is a file: [`tests/fixtures/request-contract.json`](tests/fixtures/request-contract.json).**
 Field names, required and optional, length caps, the `handoff` values, the

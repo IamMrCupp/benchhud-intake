@@ -7,6 +7,10 @@
   <p class="hint">
     Sent in from the public site. A request isn't a ticket and has no ref until
     you accept it.
+    {% if state != "pending" %}
+      {{ state | capitalize }} requests are deleted {{ retention_days }} days
+      after they were {{ state }}.
+    {% endif %}
   </p>
 
   {% if requests %}
