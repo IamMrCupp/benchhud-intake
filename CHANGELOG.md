@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.6.0...v0.7.0) (2026-11-22)
+
+
+### Features
+
+* **api:** accept repair requests through a write-only endpoint ([845f2f7](https://github.com/IamMrCupp/benchhud-intake/commit/845f2f72968e933e92e6fe1509524b45dd282eb0))
+* **api:** accept repair requests through a write-only endpoint ([#135](https://github.com/IamMrCupp/benchhud-intake/issues/135)) ([9c8ab99](https://github.com/IamMrCupp/benchhud-intake/commit/9c8ab9909fa084f92703a9f4fb6b03710ef5e903))
+
+
+### Bug Fixes
+
+* **api:** hold the request endpoint to its contract on odd input ([#135](https://github.com/IamMrCupp/benchhud-intake/issues/135)) ([1dc47fd](https://github.com/IamMrCupp/benchhud-intake/commit/1dc47fd4956ef55ad192ff4ed3e73d58a590837a))
+
 ## [0.6.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.5.0...v0.6.0) (2026-11-22)
 
 
