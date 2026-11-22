@@ -19,6 +19,7 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
 from intake import __version__, auth, web_requests
@@ -783,7 +784,8 @@ async def api_submit_request(request: Request, requests: RequestStoreDep) -> JSO
 
     try:
         payload = json.loads(body)
-    except ValueError:
+    except (ValueError, RecursionError):
+        # RecursionError: a few thousand nested brackets fit under the cap.
         return _invalid([web_requests.FieldError("body", "invalid_json")])
 
     try:
@@ -794,8 +796,11 @@ async def api_submit_request(request: Request, requests: RequestStoreDep) -> JSO
     except InvalidSubmission as exc:
         return _invalid(exc.errors)
 
+    # Off the event loop, like every other route's database work: this is the
+    # one async endpoint (it reads its own body), and a slow write on NFS must
+    # not stall /healthz.
     try:
-        public_id, _created = requests.submit(fields, idempotency_key=key)
+        public_id, _created = await run_in_threadpool(requests.submit, fields, idempotency_key=key)
     except PendingCapReached:
         return JSONResponse({"detail": "too many pending requests"}, status_code=429)
 

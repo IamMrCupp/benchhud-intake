@@ -15,12 +15,12 @@
     "Content-Type": {
       "required": true,
       "value": "application/json",
-      "note": "A charset parameter is allowed. The body is UTF-8."
+      "note": "A charset parameter is allowed. The body is UTF-8. A missing header is a 415 too."
     },
     "Idempotency-Key": {
       "required": false,
       "max_length": 200,
-      "note": "Any string the relay makes up per form submission. A repeat with the same key returns the first request's 202 and id and stores nothing new, whatever the body says. Keys are remembered for as long as the request row lives."
+      "note": "Any string the relay makes up per form submission. Surrounding whitespace is stripped; blank counts as not sent. A repeat with the same key and a valid body returns the first request's 202 and id and stores nothing new, even when the body differs and even when the queue has since filled. The body is still validated first, so an invalid repeat gets its 400. Keys are remembered for as long as the request row lives."
     }
   },
   "max_body_bytes": 16384,
@@ -86,7 +86,7 @@
           }
         ]
       },
-      "note": "Every problem is listed, in the field order above. Fields and codes only, never values."
+      "note": "Every problem is listed: field errors in the field order above, then any \"body\" error. Fields and codes only, never values."
     },
     "401": {
       "body": {
@@ -117,7 +117,7 @@
     "required": "A required field is missing or blank.",
     "one_required": "Neither email nor phone was given. Reported on both.",
     "too_long": "Over the field's max_length (or the Idempotency-Key's).",
-    "invalid": "Not a string, or not one of the allowed values.",
+    "invalid": "Not a string, not valid Unicode, or not one of the allowed values (which are case-sensitive).",
     "invalid_json": "field is \"body\": the body is not a JSON object.",
     "unknown_field": "field is \"body\": the object has a key this contract doesn't list. The key is not named."
   },
@@ -385,6 +385,53 @@
         "body": {
           "detail": "invalid request",
           "errors": [
+            {
+              "field": "body",
+              "code": "unknown_field"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid-several-at-once",
+      "why": "Different kinds of error together: field errors in field order, the body error last.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer contract-fixture-token-not-a-real-one",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "customer_name": "Sam Example",
+          "handoff": "courier",
+          "website": "https://example.com"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "detail": "invalid request",
+          "errors": [
+            {
+              "field": "email",
+              "code": "one_required"
+            },
+            {
+              "field": "phone",
+              "code": "one_required"
+            },
+            {
+              "field": "device",
+              "code": "required"
+            },
+            {
+              "field": "symptoms",
+              "code": "required"
+            },
+            {
+              "field": "handoff",
+              "code": "invalid"
+            },
             {
               "field": "body",
               "code": "unknown_field"

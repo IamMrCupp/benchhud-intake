@@ -6,6 +6,7 @@ that a request is not a ticket, and the two backstops (the pending cap and the
 idempotency key).
 """
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -142,6 +143,30 @@ def test_bad_utf8_is_a_400_not_a_500(client) -> None:
     assert response.json()["errors"] == [{"field": "body", "code": "invalid_json"}]
 
 
+def test_half_a_surrogate_pair_is_invalid_not_a_500(client, db_path) -> None:
+    """JSON can spell one; SQLite can't store one."""
+    response = client.post(
+        SUBMIT_PATH,
+        content=json.dumps({**BODY, "symptoms": "broken emoji \ud83d"}),
+        headers={**_bearer(SUBMIT_TOKEN), "Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["errors"] == [{"field": "symptoms", "code": "invalid"}]
+    assert _requests(db_path) == []
+
+
+def test_absurd_nesting_is_a_400_not_a_500(client) -> None:
+    response = client.post(
+        SUBMIT_PATH,
+        content=b"[" * 10000,
+        headers={**_bearer(SUBMIT_TOKEN), "Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["errors"] == [{"field": "body", "code": "invalid_json"}]
+
+
 # --- who gets in ------------------------------------------------------------
 
 
@@ -158,6 +183,17 @@ def test_no_token_is_401(client, db_path) -> None:
 )
 def test_a_wrong_or_malformed_header_is_401(client, header) -> None:
     response = client.post(SUBMIT_PATH, json=BODY, headers={"Authorization": header})
+
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("path", [SUBMIT_PATH, "/api/tickets"])
+def test_a_non_ascii_token_is_401_not_a_crash(client, path) -> None:
+    response = client.request(
+        "POST" if path == SUBMIT_PATH else "GET",
+        path,
+        headers={"Authorization": "Bearer caf\u00e9".encode("latin-1")},
+    )
 
     assert response.status_code == 401
 

@@ -82,6 +82,10 @@ def max_pending() -> int:
     return value if value >= 0 else DEFAULT_MAX_PENDING
 
 
+#: Every code an error can carry. The contract fixture lists the same set.
+ERROR_CODES = ("required", "one_required", "too_long", "invalid", "invalid_json", "unknown_field")
+
+
 @dataclass(frozen=True)
 class FieldError:
     """One thing wrong with a submission: which field, and a fixed code.
@@ -92,6 +96,12 @@ class FieldError:
 
     field: str
     code: str
+
+    def __post_init__(self) -> None:
+        # A code the contract doesn't list is a contract change, not a typo to
+        # find out about from the relay.
+        if self.code not in ERROR_CODES:
+            raise ValueError(f"not a contract error code: {self.code}")
 
     def as_json(self) -> dict[str, str]:
         return {"field": self.field, "code": self.code}
@@ -109,6 +119,19 @@ class PendingCapReached(Exception):
     """Too many requests are already waiting for review."""
 
 
+def _storable(value: str) -> bool:
+    """Whether a string can be written as UTF-8.
+
+    JSON can spell half of a surrogate pair (``"\\ud800"``), which Python holds
+    happily and SQLite refuses. A broken emoji from a browser form is enough.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def validate(payload: object) -> dict[str, str | None]:
     """Check a decoded JSON body against the contract and return clean fields.
 
@@ -119,32 +142,40 @@ def validate(payload: object) -> dict[str, str | None]:
     if not isinstance(payload, dict):
         raise InvalidSubmission([FieldError("body", "invalid_json")])
 
-    errors: list[FieldError] = []
+    found: dict[str, str] = {}
     cleaned: dict[str, str | None] = {}
 
     for name in FIELDS:
         value = payload.get(name)
+        cleaned[name] = None
         if value is not None and not isinstance(value, str):
-            errors.append(FieldError(name, "invalid"))
-            cleaned[name] = None
+            found[name] = "invalid"
             continue
         value = _clean(value)
-        cleaned[name] = value
         if value is None:
             if name in REQUIRED:
-                errors.append(FieldError(name, "required"))
+                found[name] = "required"
+        elif not _storable(value):
+            found[name] = "invalid"
         elif name in MAX_LENGTHS and len(value) > MAX_LENGTHS[name]:
-            errors.append(FieldError(name, "too_long"))
+            found[name] = "too_long"
         elif name == "handoff" and value not in HANDOFFS:
-            errors.append(FieldError(name, "invalid"))
+            found[name] = "invalid"
+        else:
+            cleaned[name] = value
 
     # At least one way to reach them. Reported against both fields, since
     # either one would fix it. Skipped when one of the two was sent but wrong:
     # that field already has its own error.
-    contact_errors = {e.field for e in errors} & {"email", "phone"}
-    if cleaned["email"] is None and cleaned["phone"] is None and not contact_errors:
-        errors.append(FieldError("email", "one_required"))
-        errors.append(FieldError("phone", "one_required"))
+    if (
+        cleaned["email"] is None
+        and cleaned["phone"] is None
+        and not {"email", "phone"} & set(found)
+    ):
+        found["email"] = found["phone"] = "one_required"
+
+    # Always in the contract's field order, whichever rule found them.
+    errors = [FieldError(name, found[name]) for name in FIELDS if name in found]
 
     # A key this contract doesn't know is a relay out of step with it. Said
     # without naming the key, which is the client's text.

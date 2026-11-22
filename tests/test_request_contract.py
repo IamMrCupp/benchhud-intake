@@ -144,6 +144,12 @@ def test_fields_match_the_code() -> None:
     assert auth.SUBMIT_TOKEN_ENV_VAR in CONTRACT["headers"]["Authorization"]["token"]
 
 
+def test_error_codes_are_exactly_the_ones_the_code_can_emit() -> None:
+    assert tuple(CONTRACT["error_codes"]) == web_requests.ERROR_CODES
+    with pytest.raises(ValueError):
+        web_requests.FieldError("device", "some_new_code")
+
+
 def test_error_fields_are_the_fields_plus_body_and_the_key_header() -> None:
     assert CONTRACT["error_fields"] == [
         *web_requests.FIELDS,
@@ -164,6 +170,13 @@ def test_length_cap_is_exactly_the_documented_one(name, client) -> None:
     assert over.json()["errors"] == [{"field": name, "code": "too_long"}]
 
 
+@pytest.mark.parametrize("name", [n for n, f in CONTRACT["fields"].items() if "max_length" in f])
+def test_length_is_counted_after_stripping(name, client) -> None:
+    cap = CONTRACT["fields"][name]["max_length"]
+
+    assert _post(client, {**VALID, name: "  " + "x" * cap + " \n"}).status_code == 202
+
+
 @pytest.mark.parametrize("name", [n for n, f in CONTRACT["fields"].items() if f["required"]])
 def test_required_field_is_required(name, client) -> None:
     response = _post(client, {k: v for k, v in VALID.items() if k != name})
@@ -182,6 +195,51 @@ def test_each_handoff_value_is_accepted(handoff, client) -> None:
     assert _post(client, {**VALID, "handoff": handoff}).status_code == 202
 
 
+@pytest.mark.parametrize("handoff", ["Drop_Off", "MAIL_IN", "drop-off"])
+def test_handoff_values_are_exact(handoff, client) -> None:
+    response = _post(client, {**VALID, "handoff": handoff})
+
+    assert response.status_code == 400
+    assert response.json()["errors"] == [{"field": "handoff", "code": "invalid"}]
+
+
+def test_a_wrong_contact_field_is_not_also_reported_as_missing(client) -> None:
+    response = _post(client, {**VALID, "email": 7, "phone": None})
+
+    assert response.json()["errors"] == [{"field": "email", "code": "invalid"}]
+
+
+def test_the_key_is_stripped_and_a_blank_one_is_no_key(client, db_path) -> None:
+    first = _post(client, VALID, **{"Idempotency-Key": "k1"})
+    padded = _post(client, VALID, **{"Idempotency-Key": "  k1  "})
+    assert padded.json() == first.json()
+
+    blanks = {_post(client, VALID, **{"Idempotency-Key": "   "}).json()["id"] for _ in range(2)}
+    assert len(blanks) == 2
+    assert _count(db_path) == 3
+
+
+def test_a_repeat_is_validated_before_it_is_replayed(client, db_path) -> None:
+    """As the fixture's Idempotency-Key note says."""
+    first = _post(client, VALID, **{"Idempotency-Key": "k1"})
+
+    different = _post(client, {**VALID, "device": "Other"}, **{"Idempotency-Key": "k1"})
+    invalid = _post(client, {**VALID, "device": ""}, **{"Idempotency-Key": "k1"})
+
+    assert (different.status_code, different.json()) == (202, first.json())
+    assert invalid.status_code == 400
+    assert _count(db_path) == 1
+
+
+def test_a_repeat_is_replayed_even_when_the_queue_has_filled(client, monkeypatch) -> None:
+    monkeypatch.setenv(web_requests.MAX_PENDING_ENV_VAR, "1")
+    first = _post(client, VALID, **{"Idempotency-Key": "k1"})
+
+    assert _post(client, VALID).status_code == 429
+    again = _post(client, VALID, **{"Idempotency-Key": "k1"})
+    assert (again.status_code, again.json()) == (202, first.json())
+
+
 def test_idempotency_key_cap_is_the_documented_one(client) -> None:
     cap = CONTRACT["headers"]["Idempotency-Key"]["max_length"]
 
@@ -191,14 +249,29 @@ def test_idempotency_key_cap_is_the_documented_one(client) -> None:
     assert over.json()["errors"] == [{"field": "Idempotency-Key", "code": "too_long"}]
 
 
-def test_body_cap_is_the_documented_one(client, db_path) -> None:
+def test_body_cap_is_exactly_the_documented_one(client, db_path) -> None:
     headers = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
-    oversized = b'{"symptoms": "' + b"x" * CONTRACT["max_body_bytes"] + b'"}'
+    body = json.dumps(VALID).encode()
+    at_cap = body + b" " * (CONTRACT["max_body_bytes"] - len(body))
 
-    response = client.post(SUBMIT_PATH, content=oversized, headers=headers)
+    assert client.post(SUBMIT_PATH, content=at_cap, headers=headers).status_code == 202
+    over = client.post(SUBMIT_PATH, content=at_cap + b" ", headers=headers)
 
-    assert response.status_code == 413
-    assert response.json() == CONTRACT["responses"]["413"]["body"]
+    assert over.status_code == 413
+    assert over.json() == CONTRACT["responses"]["413"]["body"]
+    assert _count(db_path) == 1
+
+
+@pytest.mark.parametrize("content_type", [None, "text/json", "application/jsonx", "text/plain"])
+def test_only_application_json_is_taken(client, db_path, content_type) -> None:
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    if content_type:
+        headers["Content-Type"] = content_type
+
+    response = client.post(SUBMIT_PATH, content=json.dumps(VALID), headers=headers)
+
+    assert response.status_code == 415
+    assert response.json() == CONTRACT["responses"]["415"]["body"]
     assert _count(db_path) == 0
 
 

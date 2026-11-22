@@ -127,7 +127,9 @@ def _bearer_matches(env_var: str, authorization: str | None) -> bool:
     if scheme.lower() != "bearer" or not presented:
         return False
 
-    return hmac.compare_digest(presented, configured)
+    # As bytes: compare_digest refuses non-ASCII text outright, and a header
+    # with an accent in it should be a 401, not a crash.
+    return hmac.compare_digest(presented.encode(), configured.encode())
 
 
 def valid_api_token(authorization: str | None) -> bool:
@@ -162,7 +164,8 @@ def valid_submit_token(authorization: str | None) -> bool:
     one string would then read the ticket API and the split would mean nothing.
     """
     submit = os.environ.get(SUBMIT_TOKEN_ENV_VAR, "").strip()
-    if submit and hmac.compare_digest(submit, os.environ.get(API_TOKEN_ENV_VAR, "").strip()):
+    api = os.environ.get(API_TOKEN_ENV_VAR, "").strip()
+    if submit and hmac.compare_digest(submit.encode(), api.encode()):
         return False
     return _bearer_matches(SUBMIT_TOKEN_ENV_VAR, authorization)
 
