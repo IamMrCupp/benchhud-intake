@@ -178,6 +178,34 @@ benchhud-intake set-password --generate   # random password, printed once on std
 benchhud-intake new-token --print         # the token alone on stdout
 ```
 
+## Looks and themes
+
+Same look as benchhud and burnwright — same palette, same panels — so the
+counter tablet and the bench screen read as one set of tools. **Appearance**,
+at the foot of every page, picks System, Light or Dark, and the choice sticks
+in that browser.
+
+Want your own? Drop a burnwright theme file into the `themes` folder in the
+data folder (`benchhud-intake paths` shows where), or point
+`INTAKE_THEMES_DIR` at a folder of them. It shows up in the Appearance list on
+the next page load. The format is burnwright's, so a theme you've already
+written for it works here unchanged:
+
+```json
+{
+  "name": "Amber terminal",
+  "base": "dark",
+  "colors": { "bg": "#120d02", "panel": "#1b1404", "fg": "#ffcf70", "accent": "#ffb000" }
+}
+```
+
+`base` is `"light"` or `"dark"`; anything you leave out comes from it. Colours
+only — hex, `rgb()` or `hsl()` — and the names are burnwright's (`bg`, `panel`,
+`border`, `fg`, `muted`, `control-bg`, `control-border`, `control-hover`,
+`accent`, `accent-soft`, `danger`, `danger-soft`, `warning`, `warning-soft`,
+`warning-border`, `ok`, `ok-soft`). A file that can't be used is named at the
+foot of the page, to anyone signed in, with the reason.
+
 ## Running it locally
 
 Requires [uv](https://docs.astral.sh/uv/). Python 3.12 is pinned via

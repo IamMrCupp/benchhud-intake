@@ -11,7 +11,7 @@
   {% endif %}
 
   <p class="status-line">
-    <strong>{{ ticket.status }}</strong>
+    <span class="pill{% if ticket.status == 'closed' %} closed{% endif %}">{{ ticket.status }}</span>
     {% if ticket.outcome %}<span class="outcome">— {{ ticket.outcome }}</span>{% endif %}
   </p>
 
@@ -57,7 +57,7 @@
             <form method="post" action="/tickets/{{ ticket.ref }}/links/{{ link.id }}/delete"
                   class="inline-delete">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-              <button type="submit">remove</button>
+              <button type="submit" class="quiet danger">remove</button>
             </form>
           </li>
         {% endfor %}

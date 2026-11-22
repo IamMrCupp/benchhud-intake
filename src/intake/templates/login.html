@@ -8,6 +8,7 @@
     <p class="error" role="alert">{{ error }}</p>
   {% endif %}
 
+  <section>
   <form method="post" action="/login">
     {# Deny-by-default: the middleware rejects any POST without this. #}
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
@@ -23,4 +24,5 @@
 
     <p><button type="submit">Sign in</button></p>
   </form>
+  </section>
 {% endblock %}

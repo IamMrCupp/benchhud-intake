@@ -12,6 +12,7 @@
     {# Deliberately no contact details here. This screen gets left open on a
        bench and read over shoulders; the customer name is enough to recognise
        a ticket, and phone/email/address belong on the detail page only. #}
+    <div class="table-card">
     <table>
       <thead>
         <tr>
@@ -28,12 +29,13 @@
             <td class="ref"><a href="/tickets/{{ ticket.ref }}">{{ ticket.ref }}</a></td>
             <td>{{ ticket.device }}</td>
             <td>{{ ticket.customer_name }}</td>
-            <td>{{ ticket.status }}{% if ticket.outcome %} ({{ ticket.outcome }}){% endif %}</td>
+            <td><span class="pill{% if ticket.status == 'closed' %} closed{% endif %}">{{ ticket.status }}</span>{% if ticket.outcome %} {{ ticket.outcome }}{% endif %}</td>
             <td>{{ ticket.created_at[:10] }}</td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
     <p class="empty">
       {% if status %}
