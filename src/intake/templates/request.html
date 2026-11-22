@@ -20,9 +20,16 @@
        was here has been blanked. #}
     <p>
       This became ticket <a href="/tickets/{{ req.ticket_ref }}">{{ req.ticket_ref }}</a>.
-      The details are on the ticket and are no longer kept here.
+      The details are on the ticket and are no longer kept here. This note is
+      deleted {{ retention_days }} days after it was accepted.
     </p>
   {% else %}
+    {% if req.state == "dismissed" %}
+      <p class="hint">
+        Dismissed. It's deleted, with everything on this page,
+        {{ retention_days }} days after it was dismissed.
+      </p>
+    {% endif %}
     <section>
       <h2>Device</h2>
       <dl>
