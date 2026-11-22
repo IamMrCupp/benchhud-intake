@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.8.0...v0.9.0) (2026-11-22)
+
+
+### Features
+
+* **requests:** purge dealt-with requests after a retention window ([#135](https://github.com/IamMrCupp/benchhud-intake/issues/135)) ([b8e7428](https://github.com/IamMrCupp/benchhud-intake/commit/b8e74282e639bbc3acf5e8267bf1c8dc66eec0f6))
+
 ## [0.8.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.7.0...v0.8.0) (2026-11-22)
 
 
