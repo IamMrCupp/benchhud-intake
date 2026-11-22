@@ -39,6 +39,19 @@ def test_posts_to_intake(html) -> None:
     assert re.search(r'<form[^>]*action="/intake"', html, re.I)
 
 
+def test_posts_as_multipart(html) -> None:
+    """The form carries a photo field, and the server reads it as an upload.
+
+    Without this a browser sends the form url-encoded, the photo arrives as a
+    bare string and every submit from the page fails with a 422. The tests
+    that post straight to /intake never noticed, because they choose the
+    encoding themselves.
+    """
+    form = re.search(r'<form[^>]*action="/intake"[^>]*>', html, re.I)
+    assert form, "no form posting to /intake"
+    assert 'enctype="multipart/form-data"' in form.group(0)
+
+
 @pytest.mark.parametrize(
     "name",
     [

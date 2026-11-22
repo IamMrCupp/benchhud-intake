@@ -252,7 +252,7 @@ def get_photo_store() -> PhotoStore:
 PhotoStoreDep = Annotated[PhotoStore, Depends(get_photo_store)]
 
 
-def _attach_photos(photo_store: PhotoStore, ref: str, uploads: list[UploadFile]) -> int:
+def _attach_photos(photo_store: PhotoStore, ref: str, uploads: list[UploadFile | str]) -> int:
     """Save each uploaded photo against a ticket, returning how many failed.
 
     A rejected photo (not an image, too large) is counted and skipped rather
@@ -260,10 +260,14 @@ def _attach_photos(photo_store: PhotoStore, ref: str, uploads: list[UploadFile])
     recoverable by retaking it while a lost intake is not. The store validates
     and cleans up partials, so a failure can't corrupt anything — it just
     doesn't attach.
+
+    A browser sends a file part even when no photo was chosen: empty, with no
+    filename. The form parser hands that over as an empty string rather than
+    an upload, so it's skipped here along with any other part that isn't one.
     """
     failed = 0
     for upload in uploads:
-        if not upload.filename:
+        if isinstance(upload, str) or not upload.filename:
             continue  # an empty file part — nothing was chosen
         try:
             photo_store.save(ref, upload.filename, upload.file.read())
@@ -422,7 +426,7 @@ def create_intake(
     request: Request,
     store: StoreDep,
     photo_store: PhotoStoreDep,
-    photos: Annotated[list[UploadFile], File()] = [],  # noqa: B006 - FastAPI reads this default
+    photos: Annotated[list[UploadFile | str], File()] = [],  # noqa: B006 - FastAPI reads this default
     customer_name: Annotated[str, Form()] = "",
     phone: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
@@ -607,7 +611,7 @@ def upload_ticket_photos(
     ref: str,
     store: StoreDep,
     photo_store: PhotoStoreDep,
-    photos: Annotated[list[UploadFile], File()] = [],  # noqa: B006 - FastAPI reads this default
+    photos: Annotated[list[UploadFile | str], File()] = [],  # noqa: B006 - FastAPI reads this default
 ) -> Response:
     """Add photos to an existing ticket.
 
