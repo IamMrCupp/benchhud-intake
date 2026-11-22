@@ -20,10 +20,11 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
-from intake import __version__, auth, web_requests
+from intake import __version__, auth, notify, web_requests
 from intake.auth import verify_password
 from intake.db import connect
 from intake.photos import Photo, PhotoError, PhotoStore
@@ -916,11 +917,18 @@ async def api_submit_request(request: Request, requests: RequestStoreDep) -> JSO
     await run_in_threadpool(requests.purge)
 
     try:
-        public_id, _created = await run_in_threadpool(requests.submit, fields, idempotency_key=key)
+        public_id, created = await run_in_threadpool(requests.submit, fields, idempotency_key=key)
     except PendingCapReached:
         return JSONResponse({"detail": "too many pending requests"}, status_code=429)
 
-    return JSONResponse({"id": public_id}, status_code=202)
+    # The ping goes out after the response, so a slow or dead webhook can't
+    # hold up or fail the relay's 202. A replayed retry made nothing new and
+    # says nothing. Only the count leaves; see intake.notify.
+    ping = None
+    if created:
+        pending = await run_in_threadpool(requests.count_pending)
+        ping = BackgroundTask(notify.request_received, pending)
+    return JSONResponse({"id": public_id}, status_code=202, background=ping)
 
 
 def _require_ticket(store: TicketStore, ref: str) -> Ticket:

@@ -77,6 +77,29 @@ deleted; `INTAKE_REQUEST_RETENTION_DAYS` changes the window. There's no
 scheduler: the purge runs when a signed-in page loads or a new request
 arrives. A request that's still waiting is never purged.
 
+### Getting told about one
+
+The count in the nav only helps if you open the app. For a request that comes
+in overnight, set `INTAKE_NOTIFY_URL` and each new request POSTs one line to
+it:
+
+```
+benchhud-intake: new repair request (2 waiting)
+```
+
+That's all it ever says. **No name, no device, no request id** — a
+notification service is someone else's computer and your phone's lock screen,
+and the details stay behind the login. It's the only outbound call this
+service makes, and it's off until you set the URL.
+
+`INTAKE_NOTIFY_FORMAT` picks the body: `json` (the default) sends
+`{"text": …, "content": …, "pending": N}`, which is the shape Slack- and
+Discord-style webhooks and Home Assistant read; `text` sends the bare line,
+which is what [ntfy](https://ntfy.sh/) wants. The URL is usually the secret, so
+keep it with the tokens (`settings.env` or the Kubernetes Secret). The ping
+goes out after the relay has its answer, times out after five seconds, and a
+failure costs a buzz, never a request.
+
 ### The contract
 
 **The contract is a file: [`tests/fixtures/request-contract.json`](tests/fixtures/request-contract.json).**
