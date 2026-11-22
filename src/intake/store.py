@@ -147,8 +147,16 @@ class TicketStore:
         accessories: str | None = None,
         condition_notes: str | None = None,
         board_id: str | None = None,
+        status: Status | str = Status.INTAKE,
     ) -> Ticket:
-        """Log a new piece of work and give it a ref."""
+        """Log a new piece of work and give it a ref.
+
+        ``status`` is where it starts: ``intake`` for something handed over at
+        the bench, ``awaiting_arrival`` for something accepted before it has
+        turned up. Any open status; a ticket can't be created closed.
+        """
+        status = to_status(status)
+        validate_outcome(status, None)
         device = (device or "").strip()
         customer_name = (customer_name or "").strip()
         phone, email = _clean(phone), _clean(email)
@@ -181,7 +189,7 @@ class TicketStore:
                     _clean(return_address),
                     _clean(accessories),
                     _clean(condition_notes),
-                    Status.INTAKE.value,
+                    status.value,
                     None,
                     stamp,
                     stamp,

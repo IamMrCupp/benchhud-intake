@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -32,7 +33,13 @@ from intake.schema import initialise
 from intake.status import Outcome, Status
 from intake.store import Ticket, TicketStore
 from intake.themes import load_themes, themes_dir
-from intake.web_requests import InvalidSubmission, PendingCapReached, RequestStore
+from intake.web_requests import (
+    InvalidSubmission,
+    NotPending,
+    PendingCapReached,
+    RequestStore,
+    WebRequest,
+)
 
 app = FastAPI(
     title="benchhud-intake",
@@ -198,8 +205,25 @@ def _csrf_context(request: Request) -> dict[str, str]:
         # so it is safe on the sign-in page.
         "source_url": source_url(),
         "license_name": LICENSE_NAME,
+        "pending_requests": _pending_requests(request),
         **_theme_context(),
     }
+
+
+def _pending_requests(request: Request) -> int:
+    """How many web requests are waiting, for the count beside "Requests".
+
+    On every page, so a request that came in overnight is seen wherever the
+    app is opened. Only for someone signed in: the sign-in page must not say
+    anything about what is in the database, not even a number.
+    """
+    if not request.session.get("authenticated"):
+        return 0
+    # Through the same provider the routes use (and tests override), so the
+    # count can never come from a different database than the page beside it.
+    provider = request.app.dependency_overrides.get(get_store, get_store)
+    with contextmanager(provider)() as store:
+        return RequestStore(store.conn).count_pending()
 
 
 def _theme_context() -> dict:
@@ -528,6 +552,80 @@ def ticket_list(request: Request, store: StoreDep, status: str | None = None) ->
             "all_statuses": [s.value for s in Status],
         },
     )
+
+
+def _require_request(requests: RequestStore, request_id: str) -> WebRequest:
+    found = requests.get(request_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="no such request")
+    return found
+
+
+@app.get("/requests", response_class=HTMLResponse)
+def request_list(
+    request: Request, requests: RequestStoreDep, state: str = "pending"
+) -> HTMLResponse:
+    """Repair requests sent in from the public site, waiting to be looked at.
+
+    Like the ticket list, **no contact details here**: a name and a device are
+    enough to pick one out, and the rest is on the request's own page.
+    """
+    try:
+        found = requests.list_requests(state)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+    return templates.TemplateResponse(
+        request=request,
+        name="requests.html",
+        context={"requests": found, "state": state, "all_states": web_requests.STATES},
+    )
+
+
+def _render_request(
+    request: Request, found: WebRequest, error: str | None = None, status_code: int = 200
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="request.html",
+        context={"req": found, "error": error},
+        status_code=status_code,
+    )
+
+
+@app.get("/requests/{request_id}", response_class=HTMLResponse)
+def request_detail(request: Request, request_id: str, requests: RequestStoreDep) -> HTMLResponse:
+    """One request in full, with the two things you can do about it."""
+    return _render_request(request, _require_request(requests, request_id))
+
+
+@app.post("/requests/{request_id}/accept")
+def accept_request(
+    request: Request, request_id: str, requests: RequestStoreDep, store: StoreDep
+) -> Response:
+    """Make the request a ticket, and go to it.
+
+    Redirects, so a refresh can't accept twice; and a second accept is refused
+    anyway, even one racing the first: the store claims the request before it
+    makes the ticket.
+    """
+    found = _require_request(requests, request_id)
+    try:
+        ticket = requests.accept(request_id, store)
+    except NotPending as exc:
+        return _render_request(request, found, error=str(exc), status_code=409)
+    return RedirectResponse(url=f"/tickets/{ticket.ref}", status_code=303)
+
+
+@app.post("/requests/{request_id}/dismiss")
+def dismiss_request(request: Request, request_id: str, requests: RequestStoreDep) -> Response:
+    """Set a request aside. It stays readable until the retention window ends."""
+    found = _require_request(requests, request_id)
+    try:
+        requests.dismiss(request_id)
+    except NotPending as exc:
+        return _render_request(request, found, error=str(exc), status_code=409)
+    return RedirectResponse(url="/requests", status_code=303)
 
 
 @app.get("/intake/{ref}", response_class=HTMLResponse)

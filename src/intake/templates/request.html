@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Request — benchhud-intake{% endblock %}
+{% block heading %}Repair request{% endblock %}
+
+{% block content %}
+  <p class="actions"><a href="/requests">All requests</a></p>
+
+  {% if error %}
+    <p class="error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <p class="status-line">
+    <span class="pill{% if req.state != 'pending' %} closed{% endif %}">{{ req.state }}</span>
+    <span class="pill">{{ req.handoff | replace("_", "-") }}</span>
+  </p>
+
+  {% if req.state == "accepted" %}
+    {# A stub: the ticket holds the customer's details now, and the copy that
+       was here has been blanked. #}
+    <p>
+      This became ticket <a href="/tickets/{{ req.ticket_ref }}">{{ req.ticket_ref }}</a>.
+      The details are on the ticket and are no longer kept here.
+    </p>
+  {% else %}
+    <section>
+      <h2>Device</h2>
+      <dl>
+        <dt>What it is</dt><dd>{{ req.device }}</dd>
+        <dt>Reported fault</dt><dd class="long-text">{{ req.symptoms }}</dd>
+      </dl>
+    </section>
+
+    {# Typed by a stranger on the public site, and shown as plain text: no
+       value here is ever turned into a link. #}
+    <section>
+      <h2>Customer</h2>
+      <dl>
+        <dt>Name</dt><dd>{{ req.customer_name }}</dd>
+        {% if req.email %}<dt>Email</dt><dd>{{ req.email }}</dd>{% endif %}
+        {% if req.phone %}<dt>Phone</dt><dd>{{ req.phone }}</dd>{% endif %}
+        {% if req.return_address %}
+          <dt>Return address</dt><dd class="address">{{ req.return_address }}</dd>
+        {% endif %}
+      </dl>
+    </section>
+  {% endif %}
+
+  {% if req.state == "pending" %}
+    <section>
+      <h2>Decide</h2>
+      <p class="hint">
+        Accept makes a ticket with the next ref, waiting for the device to
+        arrive. Dismiss sets the request aside.
+      </p>
+      <div class="request-actions">
+        <form method="post" action="/requests/{{ req.id }}/accept">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit">Accept</button>
+        </form>
+        <form method="post" action="/requests/{{ req.id }}/dismiss">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="quiet danger">Dismiss</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <p class="timestamps">
+    Received {{ req.received_at }}{% if req.resolved_at %} &middot; {{ req.state }} {{ req.resolved_at }}{% endif %}
+  </p>
+{% endblock %}
