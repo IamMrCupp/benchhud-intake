@@ -116,11 +116,20 @@ def test_intake_with_no_photo_still_works(client, photo_store) -> None:
 
 
 def test_an_empty_file_field_is_ignored(client, photo_store) -> None:
-    """A browser submits an empty file part when nothing is chosen."""
-    client.post(
-        "/intake", data=_intake(), files=[("photos", ("", b"", "application/octet-stream"))]
+    """A browser submits an empty file part when nothing is chosen.
+
+    The intake has to go through, not just leave no photo behind: the parser
+    hands the empty part over as a string, and a route that only takes uploads
+    turned every photo-less submit from the page into a 422.
+    """
+    response = client.post(
+        "/intake",
+        data=_intake(),
+        files=[("photos", ("", b"", "application/octet-stream"))],
+        follow_redirects=False,
     )
 
+    assert response.status_code == 303
     assert photo_store.list_photos("26-0001") == []
 
 
@@ -192,6 +201,21 @@ def test_later_upload_of_a_bad_photo_is_reported(client, photo_store) -> None:
     ).headers["location"]
 
     assert "photos_failed=1" in location
+    assert photo_store.list_photos("26-0001") == []
+
+
+def test_later_upload_with_nothing_chosen_is_ignored(client, photo_store) -> None:
+    """Upload pressed with no photo picked: back to the ticket, nothing added."""
+    client.post("/intake", data=_intake())
+
+    response = client.post(
+        "/tickets/26-0001/photos",
+        files=[("photos", ("", b"", "application/octet-stream"))],
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/tickets/26-0001"
     assert photo_store.list_photos("26-0001") == []
 
 
