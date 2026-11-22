@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Iterator
 from pathlib import Path
@@ -18,9 +19,10 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
-from intake import __version__, auth
+from intake import __version__, auth, web_requests
 from intake.auth import verify_password
 from intake.db import connect
 from intake.photos import Photo, PhotoError, PhotoStore
@@ -30,6 +32,7 @@ from intake.schema import initialise
 from intake.status import Outcome, Status
 from intake.store import Ticket, TicketStore
 from intake.themes import load_themes, themes_dir
+from intake.web_requests import InvalidSubmission, PendingCapReached, RequestStore
 
 app = FastAPI(
     title="benchhud-intake",
@@ -49,6 +52,9 @@ app = FastAPI(
 #: belongs here, and `tests/test_auth_required.py` enumerates the routing table
 #: to keep that honest.
 EXEMPT_PATHS = frozenset({"/healthz", "/login"})
+
+#: Where the public site's relay posts repair requests. See the middleware.
+SUBMIT_PATH = "/api/requests"
 
 #: Methods that change state and therefore need a CSRF token.
 _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -90,6 +96,16 @@ async def require_session(request: Request, call_next):
     # code, not a 302 to an HTML page a service can't use. Still deny-by-default:
     # this is a second gate, never an exemption.
     if path.startswith("/api/"):
+        # The one door the public site's relay may use, and the only thing its
+        # token opens. Matched exactly, so the submit token falls through to a
+        # 401 on every other /api path, and neither a session nor the API token
+        # gets in here: a browser session posting JSON would skip the CSRF
+        # check below, and benchhud's token has no business writing requests.
+        if path == SUBMIT_PATH:
+            if auth.valid_submit_token(request.headers.get("authorization")):
+                return await call_next(request)
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+
         if auth.valid_api_token(request.headers.get("authorization")) or request.session.get(
             "authenticated"
         ):
@@ -234,6 +250,14 @@ def get_store() -> Iterator[TicketStore]:
 
 
 StoreDep = Annotated[TicketStore, Depends(get_store)]
+
+
+def get_request_store(store: StoreDep) -> RequestStore:
+    """The request store, on the same connection as the ticket store."""
+    return RequestStore(store.conn)
+
+
+RequestStoreDep = Annotated[RequestStore, Depends(get_request_store)]
 
 
 def get_uploads_path() -> Path:
@@ -713,6 +737,74 @@ def api_get_ticket(request: Request, ref: str, store: StoreDep) -> dict:
     """One ticket by ref, or 404 — benchhud's ``get_ticket`` path."""
     ticket = _require_ticket(store, ref)
     return to_benchhud_ticket(ticket, str(request.base_url))
+
+
+async def _read_capped(request: Request, limit: int) -> bytes | None:
+    """The request body, or ``None`` once it runs past ``limit`` bytes.
+
+    Read as a stream so an oversized body is dropped part-way rather than held
+    in memory first and measured after.
+    """
+    body = b""
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > limit:
+            return None
+    return body
+
+
+def _invalid(errors: list[web_requests.FieldError]) -> JSONResponse:
+    return JSONResponse(
+        {"detail": "invalid request", "errors": [e.as_json() for e in errors]},
+        status_code=400,
+    )
+
+
+@app.post(SUBMIT_PATH)
+async def api_submit_request(request: Request, requests: RequestStoreDep) -> JSONResponse:
+    """Take in a repair request forwarded by the public site's relay.
+
+    **Write-only.** The answer is ``202`` and an opaque id: no ref (there isn't
+    one until someone at the bench accepts it) and no echo of what was sent. An
+    error names fields and gives fixed codes, never the values, so nothing a
+    stranger typed ends up in the relay's logs by way of this response.
+
+    The body is read and checked by hand rather than declared as a model:
+    FastAPI's own validation errors quote the offending input back.
+
+    The shapes here are pinned in ``tests/fixtures/request-contract.json``.
+    """
+    media_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+    if media_type != "application/json":
+        return JSONResponse({"detail": "unsupported media type"}, status_code=415)
+
+    body = await _read_capped(request, web_requests.MAX_BODY_BYTES)
+    if body is None:
+        return JSONResponse({"detail": "payload too large"}, status_code=413)
+
+    try:
+        payload = json.loads(body)
+    except (ValueError, RecursionError):
+        # RecursionError: a few thousand nested brackets fit under the cap.
+        return _invalid([web_requests.FieldError("body", "invalid_json")])
+
+    try:
+        fields = web_requests.validate(payload)
+        key = web_requests.clean_idempotency_key(
+            request.headers.get(web_requests.IDEMPOTENCY_HEADER)
+        )
+    except InvalidSubmission as exc:
+        return _invalid(exc.errors)
+
+    # Off the event loop, like every other route's database work: this is the
+    # one async endpoint (it reads its own body), and a slow write on NFS must
+    # not stall /healthz.
+    try:
+        public_id, _created = await run_in_threadpool(requests.submit, fields, idempotency_key=key)
+    except PendingCapReached:
+        return JSONResponse({"detail": "too many pending requests"}, status_code=429)
+
+    return JSONResponse({"id": public_id}, status_code=202)
 
 
 def _require_ticket(store: TicketStore, ref: str) -> Ticket:

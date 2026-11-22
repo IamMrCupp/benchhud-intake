@@ -17,6 +17,49 @@ is the bench log.
 That split is why this repo is the one holding customer PII, and why it stays
 LAN-only and never gets a public ingress.
 
+## Repair requests from the public site
+
+The shop's public site has a "request a repair" form. The request lands here,
+and this service still isn't on the internet. A small relay that lives with the
+site takes the form and forwards it over the private network:
+
+```
+browser → public relay → (private network, submit token) → POST /api/requests
+          (the site's repo)                                  (this service)
+```
+
+`POST /api/requests` is **write-only**. It takes JSON, answers `202` with an
+opaque id, and says nothing else — no ref, no echo of what was sent. A request
+isn't a ticket: it gets no `YY-NNNN` ref and never shows up in `/api/tickets`
+until someone at the bench accepts it.
+
+The relay authenticates with its own token, sent as
+`Authorization: Bearer <token>`:
+
+```bash
+benchhud-intake new-submit-token          # saved as INTAKE_SUBMIT_TOKEN
+benchhud-intake new-submit-token --print  # the token alone on stdout
+```
+
+That token opens this one route. It gets a `401` on `/api/tickets` and
+everything else, so a relay that's been broken into can add to a queue you
+review and can't read a customer record. With no `INTAKE_SUBMIT_TOKEN` set the
+route answers `401` to everyone. Don't reuse the API token for it — set both to
+the same value and the submit token stops working, on purpose.
+
+Two backstops don't depend on the relay behaving. Past
+`INTAKE_MAX_PENDING_REQUESTS` unreviewed requests (default 200) the route
+answers `429` and stores nothing. And a relay that sends an `Idempotency-Key`
+header can retry safely: the same key gets the same answer and no second
+request.
+
+**The contract is a file: [`tests/fixtures/request-contract.json`](tests/fixtures/request-contract.json).**
+Field names, required and optional, length caps, the `handoff` values, the
+headers, and the exact body for `202`, `400`, `401`, `413`, `415` and `429`,
+with an example of each. `tests/test_request_contract.py` replays every example
+against the real endpoint, so the file can't drift from the code. If you're
+building the other end, copy it rather than guess.
+
 ## Downloads
 
 Every [release](https://github.com/IamMrCupp/benchhud-intake/releases) has its installers

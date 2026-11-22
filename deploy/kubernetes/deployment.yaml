@@ -37,7 +37,8 @@ spec:
               value: "0"
           envFrom:
             # INTAKE_PASSWORD_HASH (required), INTAKE_SESSION_SECRET and
-            # INTAKE_API_TOKEN (optional). See secret.example.yaml. The app
+            # INTAKE_API_TOKEN / INTAKE_SUBMIT_TOKEN (optional). See
+            # secret.example.yaml. The app
             # refuses to start with no password hash, by design.
             - secretRef:
                 name: benchhud-intake-secrets

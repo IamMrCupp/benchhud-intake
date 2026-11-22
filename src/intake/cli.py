@@ -4,6 +4,7 @@
     benchhud-intake new-token        # optional: the API token benchhud uses
     benchhud-intake set-password --stdin | --generate   # non-interactive
     benchhud-intake new-token --print                   # token alone on stdout
+    benchhud-intake new-submit-token # optional: the write-only token the site's relay uses
     benchhud-intake serve            # http://127.0.0.1:8401/
     benchhud-intake paths            # where the data and settings live
 
@@ -108,6 +109,21 @@ def cmd_new_token(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_new_submit_token(args: argparse.Namespace) -> int:
+    token = secrets.token_urlsafe(32)
+    path = settings.settings_path(_data(args))
+    settings.write_setting(path, auth.SUBMIT_TOKEN_ENV_VAR, token)
+    print(token)
+    if not getattr(args, "print_only", False):
+        print(
+            f"Saved to {path}. Give it to the public site's relay and to nothing else: "
+            "it can send repair requests in and can't read anything back. "
+            "The old token, if any, stops working when benchhud-intake restarts.",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def cmd_tray(args: argparse.Namespace) -> int:
     if args.data_dir:
         os.environ[settings.DATA_DIR_ENV] = str(Path(args.data_dir).expanduser())
@@ -160,6 +176,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="print only the token on stdout, for scripts",
     )
     new_token.set_defaults(func=cmd_new_token)
+    new_submit_token = sub.add_parser(
+        "new-submit-token", help="make the write-only token the public site's relay uses"
+    )
+    new_submit_token.add_argument(
+        "--print",
+        dest="print_only",
+        action="store_true",
+        help="print only the token on stdout, for scripts",
+    )
+    new_submit_token.set_defaults(func=cmd_new_submit_token)
     sub.add_parser("paths", help="show where data and settings live").set_defaults(func=cmd_paths)
     sub.add_parser("tray", help="run as a menu-bar / tray app").set_defaults(func=cmd_tray)
     return parser
