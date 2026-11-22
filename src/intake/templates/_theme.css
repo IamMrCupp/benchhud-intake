@@ -1,0 +1,445 @@
+/* The bench look: burnwright's and benchhud's palette and panel treatment.
+
+   Every colour on a page is one of the --bw-* properties below, the same
+   names and values as burnwright's App.css. :root is the light look and
+   [data-theme="dark"] the dark one; _theme.js sets data-theme from the
+   Appearance choice, and a custom theme sets some of these inline over its
+   base look (see intake/themes.py). Rules below this block use these and
+   define no colours of their own. */
+
+:root {
+  --bw-bg: #f1f1f4;
+  --bw-panel: #ffffff;
+  --bw-border: #d2d2d8;
+  --bw-fg: #1d1d1f;
+  --bw-muted: #5c5c63;
+
+  --bw-control-bg: #ffffff;
+  --bw-control-border: #b9b9c2;
+  --bw-control-hover: #f0f2f8;
+
+  --bw-accent: #2f5fcf;
+  --bw-accent-soft: #e3ebff;
+
+  --bw-danger: #b3261e;
+  --bw-danger-soft: #fdecea;
+  --bw-warning: #8a4b06;
+  --bw-warning-soft: #fff5e0;
+  --bw-warning-border: #b45309;
+  --bw-ok: #1b6b3a;
+  --bw-ok-soft: #e8f5ec;
+
+  --bw-backdrop: rgba(0, 0, 0, 0.45);
+  --bw-shadow: rgba(0, 0, 0, 0.35);
+
+  /* 44px is the long-standing minimum for a reliable finger target.
+     Everything interactive is sized off this. Not a colour, so not a
+     theme's to change. */
+  --touch: 44px;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bw-bg: #151517;
+  --bw-panel: #1f1f22;
+  --bw-border: #3a3a40;
+  --bw-fg: #ececef;
+  --bw-muted: #a3a3ab;
+
+  --bw-control-bg: #2a2a2e;
+  --bw-control-border: #55555d;
+  --bw-control-hover: #34343a;
+
+  --bw-accent: #8fb0ff;
+  --bw-accent-soft: #24345c;
+
+  --bw-danger: #ff9a92;
+  --bw-danger-soft: #4a1f1c;
+  --bw-warning: #ffc66b;
+  --bw-warning-soft: #3d2e10;
+  --bw-warning-border: #f59e0b;
+  --bw-ok: #7fd6a0;
+  --bw-ok-soft: #173624;
+
+  color-scheme: dark;
+}
+
+/* Before the script has run (or with it blocked): follow the system, so a
+   dark tablet doesn't open on a white page. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bw-bg: #151517;
+    --bw-panel: #1f1f22;
+    --bw-border: #3a3a40;
+    --bw-fg: #ececef;
+    --bw-muted: #a3a3ab;
+    --bw-control-bg: #2a2a2e;
+    --bw-control-border: #55555d;
+    --bw-control-hover: #34343a;
+    --bw-accent: #8fb0ff;
+    --bw-accent-soft: #24345c;
+    --bw-danger: #ff9a92;
+    --bw-danger-soft: #4a1f1c;
+    --bw-warning: #ffc66b;
+    --bw-warning-soft: #3d2e10;
+    --bw-warning-border: #f59e0b;
+    --bw-ok: #7fd6a0;
+    --bw-ok-soft: #173624;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bw-bg);
+  color: var(--bw-fg);
+  /* Inter where it's installed, as burnwright and benchhud bundle it; the
+     system face otherwise. */
+  font: 17px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* --- the app bar ------------------------------------------------------- */
+
+.app-bar {
+  background: var(--bw-panel);
+  border-bottom: 1px solid var(--bw-border);
+}
+
+.app-bar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  max-width: var(--page-width, 46rem);
+  margin: 0 auto;
+  padding: 0 1rem;
+  min-height: calc(var(--touch) + 0.5rem);
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--bw-fg);
+  text-decoration: none;
+  margin-right: auto;
+  min-height: var(--touch);
+  line-height: var(--touch);
+}
+.brand span { color: var(--bw-muted); font-weight: 500; }
+
+.app-nav { display: flex; gap: 0.25rem; align-items: center; }
+
+/* Mode buttons, burnwright's: quiet until they're the page you're on. */
+.app-nav a {
+  display: inline-block;
+  min-height: var(--touch);
+  line-height: calc(var(--touch) - 2px);
+  padding: 0 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--bw-muted);
+  font-weight: 500;
+  text-decoration: none;
+}
+.app-nav a:hover { color: var(--bw-fg); background: var(--bw-control-hover); }
+.app-nav a[aria-current="page"] {
+  color: var(--bw-fg);
+  background: var(--bw-bg);
+  border-color: var(--bw-border);
+}
+
+/* Secondary action: must not compete with the primary button on a page. */
+.signout { margin: 0; }
+.signout button {
+  width: auto;
+  min-height: var(--touch);
+  padding: 0 1rem;
+  background: transparent;
+  color: var(--bw-muted);
+  border-color: var(--bw-border);
+  font-weight: 500;
+}
+
+/* --- the page ---------------------------------------------------------- */
+
+main {
+  max-width: var(--page-width, 46rem);
+  margin: 0 auto;
+  padding: 1.25rem 1rem 0;
+}
+
+h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+
+/* Section headings: small capitals in the quiet colour, as a panel's
+   heading is in benchhud. */
+h2 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bw-muted);
+  margin: 0 0 0.75rem;
+}
+h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; }
+
+a { color: var(--bw-accent); font-weight: 500; }
+
+/* A section is a card, as a panel is in burnwright and a dock in benchhud. */
+section, fieldset {
+  background: var(--bw-panel);
+  border: 1px solid var(--bw-border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0 0 1rem;
+}
+
+fieldset { padding-top: 0.5rem; }
+
+legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bw-muted);
+  padding: 0 0.4rem;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+/* 16px is a hard floor: below it, iOS Safari zooms the viewport on focus and
+   the layout jumps mid-typing. Maddening with a customer waiting. */
+input, textarea, select, button {
+  font: inherit;
+  font-size: 17px;
+  width: 100%;
+  min-height: var(--touch);
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--bw-control-border);
+  border-radius: 6px;
+  background: var(--bw-control-bg);
+  color: var(--bw-fg);
+}
+
+input::placeholder, textarea::placeholder { color: var(--bw-muted); opacity: 0.8; }
+input:hover, textarea:hover, select:hover { border-color: var(--bw-muted); }
+
+textarea { min-height: calc(var(--touch) * 1.8); resize: vertical; }
+
+input[type="file"] { padding: 0.45rem 0.5rem; }
+input[type="file"]::file-selector-button {
+  font: inherit;
+  margin-right: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--bw-control-border);
+  border-radius: 6px;
+  background: var(--bw-control-hover);
+  color: var(--bw-fg);
+}
+
+/* Keyboard and touch focus is always visible. */
+:focus-visible, input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--bw-accent);
+  outline-offset: 1px;
+}
+
+button {
+  font-weight: 500;
+  cursor: pointer;
+}
+button:hover { background: var(--bw-control-hover); border-color: var(--bw-accent); }
+
+/* The one button a form is for: filled with the accent. Comfortably past the
+   minimum — it's the one control you always hit. */
+button[type="submit"]:not(.quiet) {
+  min-height: calc(var(--touch) * 1.2);
+  background: var(--bw-accent);
+  border-color: var(--bw-accent);
+  color: var(--bw-panel);
+  font-weight: 600;
+}
+button[type="submit"]:not(.quiet):hover { filter: brightness(1.08); }
+
+/* A small action beside something else: remove a link, sign out. */
+button.quiet {
+  width: auto;
+  min-height: calc(var(--touch) - 8px);
+  padding: 0 0.8rem;
+  background: transparent;
+  color: var(--bw-muted);
+}
+button.danger { color: var(--bw-danger); border-color: var(--bw-danger); }
+button.danger:hover { background: var(--bw-danger-soft); }
+
+.hint { display: block; color: var(--bw-muted); font-size: 0.9rem; font-weight: 400; }
+
+/* A notice: a tinted line with a stripe down its left edge, burnwright's. */
+.error, .notice {
+  border-left: 4px solid var(--bw-danger);
+  background: var(--bw-danger-soft);
+  color: var(--bw-danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.notice.warning {
+  border-left-color: var(--bw-warning-border);
+  background: var(--bw-warning-soft);
+  color: var(--bw-warning);
+}
+.notice.ok {
+  border-left-color: var(--bw-ok);
+  background: var(--bw-ok-soft);
+  color: var(--bw-ok);
+}
+
+/* A ticket's state, small and tinted. */
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bw-accent-soft);
+  color: var(--bw-fg);
+  font-size: 0.9em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill.closed { background: var(--bw-control-hover); color: var(--bw-muted); }
+
+/* The whole point of the confirmation page. This gets read across a bench
+   and copied onto a strip of tape. */
+.ref-display {
+  font-size: clamp(3rem, 18vw, 6rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  margin: 0.5rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ref-instruction { text-align: center; color: var(--bw-muted); margin: 0 0 1.5rem; }
+
+/* Tables sit in a card of their own. */
+.table-card {
+  background: var(--bw-panel);
+  border: 1px solid var(--bw-border);
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0 0 1rem;
+}
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--bw-border); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--bw-control-hover); }
+th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bw-muted);
+  background: var(--bw-bg);
+}
+
+/* Row links need to be as tappable as buttons. */
+td.ref a {
+  display: inline-block;
+  min-height: var(--touch);
+  line-height: var(--touch);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+dl { margin: 0; }
+dt {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bw-muted);
+  margin-top: 0.75rem;
+}
+dt:first-child { margin-top: 0; }
+dd { margin: 0.15rem 0 0; }
+/* Return addresses are multi-line and must render as typed. */
+dd.address { white-space: pre-line; }
+
+.status-line { font-size: 1.25rem; margin: 0 0 1rem; }
+.actions a, .filters a, .filters strong {
+  display: inline-block;
+  min-height: var(--touch);
+  line-height: var(--touch);
+}
+.filters strong { color: var(--bw-fg); }
+.empty { color: var(--bw-muted); }
+.timestamps { color: var(--bw-muted); font-size: 0.85rem; margin-top: 1.5rem; }
+
+/* Doc links: one row each, the remove button at the end. */
+.doc-links { list-style: none; padding: 0; margin: 0 0 1rem; }
+.doc-links li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--bw-border);
+}
+.doc-links li:last-child { border-bottom: none; }
+.inline-delete { margin: 0; flex: none; }
+.unsafe { color: var(--bw-warning); }
+
+.photo-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.5rem;
+}
+.photo-grid a { display: block; }
+.photo-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--bw-border);
+  border-radius: 6px;
+  background: var(--bw-bg);
+}
+
+/* --- the foot: source link and the Appearance choice -------------------- */
+
+.page-foot {
+  max-width: var(--page-width, 46rem);
+  margin: 2rem auto 0;
+  padding: 0.5rem 1rem 1.5rem;
+  border-top: 1px solid var(--bw-border);
+  color: var(--bw-muted);
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+/* Where the code lives. Small and out of the way, but the link is still a
+   full-height finger target. */
+footer a {
+  display: inline-block;
+  min-height: var(--touch);
+  line-height: var(--touch);
+}
+
+.appearance { display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+.appearance label { margin: 0; font-weight: 500; }
+.appearance select { width: auto; font-size: 16px; padding: 0.3rem 0.5rem; }
+.theme-problems { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }
+.theme-problems ul { margin: 0.25rem 0 0; padding-left: 1.25rem; }

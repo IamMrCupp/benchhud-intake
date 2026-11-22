@@ -29,6 +29,7 @@ from intake.ratelimit import RateLimiter
 from intake.schema import initialise
 from intake.status import Outcome, Status
 from intake.store import Ticket, TicketStore
+from intake.themes import load_themes, themes_dir
 
 app = FastAPI(
     title="benchhud-intake",
@@ -181,6 +182,25 @@ def _csrf_context(request: Request) -> dict[str, str]:
         # so it is safe on the sign-in page.
         "source_url": source_url(),
         "license_name": LICENSE_NAME,
+        **_theme_context(),
+    }
+
+
+def _theme_context() -> dict:
+    """The custom themes for the Appearance choice, read fresh on each page.
+
+    Colours only, checked in ``intake.themes``, so they're safe on the sign-in
+    page too. Which files failed, and the folder's path, are shown only to
+    someone signed in (see base.html).
+    """
+    folder = themes_dir()
+    themes, broken = load_themes(folder)
+    problems = [f"{b.file}: {b.reason}" for b in broken]
+    problems += [f"{t.id}: {note}" for t in themes for note in t.ignored]
+    return {
+        "themes": [t.as_json() for t in themes],
+        "theme_problems": problems,
+        "themes_folder": str(folder),
     }
 
 

@@ -7,9 +7,11 @@
   {# The ref is the entire point of this page. It gets read across the bench
      and copied onto a strip of tape stuck to the board, so it wants to be
      legible at arm's length rather than merely present. #}
+  <section>
   <p class="ref-display">{{ ticket.ref }}</p>
 
   <p class="ref-instruction">Write this on the tape.</p>
+  </section>
 
   {% if photos_failed %}
     <p class="error" role="alert">
@@ -18,6 +20,7 @@
     </p>
   {% endif %}
 
+  <section>
   <dl>
     <dt>Device</dt>
     <dd>{{ ticket.device }}</dd>
@@ -30,6 +33,7 @@
       <dd>{{ ticket.symptoms }}</dd>
     {% endif %}
   </dl>
+  </section>
 
   <p>
     <a href="/intake">Take in another</a>
