@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.1](https://github.com/IamMrCupp/benchhud-intake/compare/v0.10.0...v0.10.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **auth:** believe no forwarded header, loopback included, unless a proxy is listed ([#154](https://github.com/IamMrCupp/benchhud-intake/issues/154)) ([55e558b](https://github.com/IamMrCupp/benchhud-intake/commit/55e558b06a3f89df9f16386d4af0a80c4e3c1281))
+* **auth:** count failed logins per browser behind a trusted proxy ([#154](https://github.com/IamMrCupp/benchhud-intake/issues/154)) ([7ce853c](https://github.com/IamMrCupp/benchhud-intake/commit/7ce853c6801c13ac4ee392a5a9bbb9ff34a5441f))
+* **auth:** count failed logins per browser behind a trusted proxy ([#154](https://github.com/IamMrCupp/benchhud-intake/issues/154)) ([23ea8fe](https://github.com/IamMrCupp/benchhud-intake/commit/23ea8fefb8f3f99a7114de7f3605712be45ff108))
+
 ## [0.10.0](https://github.com/IamMrCupp/benchhud-intake/compare/v0.9.0...v0.10.0) (2026-11-22)
 
 
