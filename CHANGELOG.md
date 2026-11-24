@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.2](https://github.com/IamMrCupp/benchhud-intake/compare/v0.10.1...v0.10.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **tray:** pin the port in settings.env so a default change can't move it ([09673f3](https://github.com/IamMrCupp/benchhud-intake/commit/09673f36de8ca6b5b58ebb972a19f04785583e4a))
+* **tray:** pin the port in settings.env so a default change can't move it ([00f600a](https://github.com/IamMrCupp/benchhud-intake/commit/00f600a365ae79de63f4d3aedacd2d0a0e61dce6))
+
 ## [0.10.1](https://github.com/IamMrCupp/benchhud-intake/compare/v0.10.0...v0.10.1) (2026-11-24)
 
 
