@@ -3,7 +3,7 @@
 Failed logins are counted per client address. Behind a proxy every browser
 arrives from the proxy, so without help one person's wrong guesses lock out the
 whole bench. `INTAKE_TRUSTED_PROXIES` names the proxies whose
-`X-Forwarded-For` is believed; `serve` hands the list to the server
+`X-Forwarded-For` is believed; `serve` and the tray app hand the list to the server
 (`tests/test_cli.py` covers that half).
 
 These tests put the app behind the same middleware the server installs, with
@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from conftest import CsrfClient, sign_in
-from intake import auth, cli
+from intake import auth, proxies
 from intake.app import SUBMIT_PATH, app
 from intake.db import connect
 from intake.ratelimit import DEFAULT_MAX_ATTEMPTS
@@ -50,8 +50,8 @@ def db_path(tmp_path, monkeypatch):
 def behind_proxy(db_path, monkeypatch):
     """The app as `serve` runs it with the setting on: the list goes through
     the same parser, into the same middleware."""
-    monkeypatch.setenv(cli.TRUSTED_PROXIES_ENV_VAR, PROXY_RANGE)
-    return ProxyHeadersMiddleware(app, trusted_hosts=cli.trusted_proxies())
+    monkeypatch.setenv(proxies.TRUSTED_PROXIES_ENV_VAR, PROXY_RANGE)
+    return ProxyHeadersMiddleware(app, trusted_hosts=proxies.trusted_proxies())
 
 
 def _client(asgi_app, peer) -> CsrfClient:
@@ -175,3 +175,71 @@ def test_the_scheme_is_not_taken_from_a_stranger(behind_proxy, a_ticket) -> None
     url = _one_ticket_url(_client(behind_proxy, STRANGER), **{"X-Forwarded-Proto": "https"})
 
     assert url.startswith("http://")
+
+
+# --- the real server, over real HTTP ----------------------------------------
+#
+# Everything above goes through the middleware by hand. These start the server
+# the way the tray app does and connect over loopback, which is the address the
+# server would believe by default if nothing told it otherwise.
+
+
+async def _who_am_i(scope, receive, send) -> None:
+    """The smallest app that can answer "what address do you think I am?"."""
+    if scope["type"] != "http":
+        return
+    client = scope.get("client") or ("", 0)
+    body = f"{scope['scheme']} {client[0]}".encode()
+    await send({"type": "http.response.start", "status": 200, "headers": []})
+    await send({"type": "http.response.body", "body": body})
+
+
+def _ask(forwarded_for: str) -> str:
+    import urllib.request
+
+    from intake.server import ServerController
+
+    controller = ServerController(app_factory=lambda: _who_am_i)
+    state = controller.start("127.0.0.1", 0, timeout=5)
+    assert state.running, state.error
+    try:
+        request = urllib.request.Request(
+            state.url,
+            headers={"X-Forwarded-For": forwarded_for, "X-Forwarded-Proto": "https"},
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.read().decode()
+    finally:
+        controller.stop()
+
+
+def test_unset_the_real_server_believes_nobody_not_even_loopback(monkeypatch) -> None:
+    """On a one-machine install every browser is loopback. If loopback were
+    believed, any of them could choose its own lockout bucket."""
+    monkeypatch.delenv(proxies.TRUSTED_PROXIES_ENV_VAR, raising=False)
+
+    assert _ask(TABLET) == "http 127.0.0.1"
+
+
+def test_set_the_real_server_believes_the_listed_proxy(monkeypatch) -> None:
+    monkeypatch.setenv(proxies.TRUSTED_PROXIES_ENV_VAR, "127.0.0.1")
+
+    assert _ask(TABLET) == f"https {TABLET}"
+
+
+def test_listing_some_other_proxy_does_not_make_loopback_believed(monkeypatch) -> None:
+    monkeypatch.setenv(proxies.TRUSTED_PROXIES_ENV_VAR, PROXY_RANGE)
+
+    assert _ask(TABLET) == "http 127.0.0.1"
+
+
+def test_the_tray_server_will_not_start_on_a_list_it_cannot_read(monkeypatch) -> None:
+    from intake.server import ServerController
+
+    monkeypatch.setenv(proxies.TRUSTED_PROXIES_ENV_VAR, "*")
+
+    state = ServerController(app_factory=lambda: _who_am_i).start("127.0.0.1", 0, timeout=5)
+
+    assert not state.running
+    assert proxies.TRUSTED_PROXIES_ENV_VAR in state.error
+    assert "every address" in state.error

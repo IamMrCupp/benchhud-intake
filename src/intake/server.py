@@ -53,8 +53,19 @@ class ServerController:
         """Start serving. Returns once it's listening, or with ``error`` set."""
         import uvicorn
 
+        from intake import proxies
+
         self.stop()
-        config = uvicorn.Config(self._app_factory(), host=host, port=port, log_level="warning")
+        try:
+            forwarded = proxies.server_options()
+        except ValueError as exc:
+            self._state = ServerState(
+                False, host, port, f"{proxies.TRUSTED_PROXIES_ENV_VAR}: {exc}"
+            )
+            return self._state
+        config = uvicorn.Config(
+            self._app_factory(), host=host, port=port, log_level="warning", **forwarded
+        )
         server = uvicorn.Server(config)
         failure: list[str] = []
 

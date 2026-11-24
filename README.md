@@ -394,9 +394,10 @@ the links in API responses say `https`.
 Keep the list as narrow as you can. Anything inside it can claim to be any
 address, which means it can pick its own lockout bucket. On Kubernetes that is
 usually the ingress controller's pod range, not the whole LAN. A header from
-anywhere outside the list is ignored, as it always was.
+anywhere outside the list is ignored. A proxy on the same machine counts too:
+list `127.0.0.1` if that is where yours runs.
 
-`serve` refuses to start on `*`, on a range that covers every address, and on
+The server refuses to start on `*`, on a range that covers every address, and on
 an entry it can't read. A typo here should not quietly mean "trust nothing".
 
 ## License

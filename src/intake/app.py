@@ -78,7 +78,7 @@ def _client_ip(request: Request) -> str | None:
 
     Never reads `X-Forwarded-For` itself: a header anyone can set would let
     them reset their own throttle bucket by changing it. Behind a reverse
-    proxy, name the proxy in `INTAKE_TRUSTED_PROXIES` (see `intake.cli`); the
+    proxy, name the proxy in `INTAKE_TRUSTED_PROXIES` (see `intake.proxies`); the
     server then puts the forwarded address here, and only when the connection
     really came from that proxy.
     """
