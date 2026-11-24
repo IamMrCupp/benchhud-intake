@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from intake import auth, cli, settings
+from intake import auth, cli, proxies, settings
 
 # --- the data folder ------------------------------------------------------------
 
@@ -140,7 +140,7 @@ def test_serve_uses_the_data_folder_and_stays_on_loopback(tmp_path, monkeypatch,
         _args(tmp_path, "serve", "--port", "8123"), run=lambda app, **kw: calls.append(kw)
     )
     assert code == 0
-    assert calls == [{"host": "127.0.0.1", "port": 8123}]
+    assert calls == [{"host": "127.0.0.1", "port": 8123, "proxy_headers": False}]
     assert os.environ["INTAKE_DB_PATH"] == str(tmp_path / "intake.db")
     assert "anyone on this network" not in capsys.readouterr().err
 
@@ -159,7 +159,7 @@ def test_serve_defaults_to_port_8401(tmp_path) -> None:
     """bench-suite's host port for intake: 8401 (parts 8402, recon 8403)."""
     calls = []
     cli.cmd_serve(_args(tmp_path, "serve"), run=lambda app, **kw: calls.append(kw))
-    assert calls == [{"host": "127.0.0.1", "port": 8401}]
+    assert calls == [{"host": "127.0.0.1", "port": 8401, "proxy_headers": False}]
 
 
 # --- non-interactive flags, for bench-setup ---------------------------------------
@@ -261,3 +261,97 @@ def test_the_two_tokens_are_separate_secrets(tmp_path, capsys) -> None:
     assert api != submit
     assert saved[auth.API_TOKEN_ENV_VAR] == api  # making one leaves the other alone
     assert saved[auth.SUBMIT_TOKEN_ENV_VAR] == submit
+
+
+# --- trusted proxies -----------------------------------------------------------------
+
+
+def _serve_kwargs(tmp_path) -> list[dict]:
+    calls: list[dict] = []
+    code = cli.cmd_serve(_args(tmp_path, "serve"), run=lambda app, **kw: calls.append(kw))
+    assert code == 0
+    return calls
+
+
+def test_serve_trusts_no_proxy_unless_told(tmp_path) -> None:
+    """Unset, forwarded headers are off altogether. The server's own default
+    believes them from loopback, which on a one-machine install is everyone."""
+    os.environ.pop(proxies.TRUSTED_PROXIES_ENV_VAR, None)
+
+    assert _serve_kwargs(tmp_path) == [{"host": "127.0.0.1", "port": 8401, "proxy_headers": False}]
+
+
+def _installs_proxy_middleware(kwargs: dict) -> bool:
+    """Ask the real server what it would wrap the app in for these arguments."""
+    import uvicorn
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+    from intake.app import app
+
+    config = uvicorn.Config(app, **kwargs)
+    config.load()
+    return isinstance(config.loaded_app, ProxyHeadersMiddleware)
+
+
+def test_the_server_reads_no_forwarded_headers_when_unset(tmp_path) -> None:
+    os.environ.pop(proxies.TRUSTED_PROXIES_ENV_VAR, None)
+
+    assert not _installs_proxy_middleware(_serve_kwargs(tmp_path)[0])
+
+
+def test_the_server_reads_them_from_the_listed_proxies_when_set(tmp_path) -> None:
+    os.environ[proxies.TRUSTED_PROXIES_ENV_VAR] = "10.42.0.0/16"
+
+    assert _installs_proxy_middleware(_serve_kwargs(tmp_path)[0])
+
+
+@pytest.mark.parametrize("blank", ["", "  ", " , "])
+def test_a_blank_proxy_list_is_unset(tmp_path, blank) -> None:
+    os.environ[proxies.TRUSTED_PROXIES_ENV_VAR] = blank
+
+    assert _serve_kwargs(tmp_path)[0]["proxy_headers"] is False
+
+
+def test_serve_hands_the_proxy_list_to_the_server(tmp_path) -> None:
+    os.environ[proxies.TRUSTED_PROXIES_ENV_VAR] = " 10.42.0.0/16 , 192.168.7.206,fd00::/64 "
+
+    assert _serve_kwargs(tmp_path)[0]["forwarded_allow_ips"] == (
+        "10.42.0.0/16,192.168.7.206/32,fd00::/64"
+    )
+
+
+def test_a_range_written_with_host_bits_is_the_range(tmp_path) -> None:
+    """`10.42.0.1/16` is what people type. The server would read it as a
+    hostname and trust nothing."""
+    os.environ[proxies.TRUSTED_PROXIES_ENV_VAR] = "10.42.0.1/16"
+
+    assert _serve_kwargs(tmp_path)[0]["forwarded_allow_ips"] == "10.42.0.0/16"
+
+
+@pytest.mark.parametrize("everyone", ["*", "0.0.0.0/0", "::/0", "10.42.0.0/16, *"])
+def test_serve_refuses_to_trust_every_address(tmp_path, capsys, everyone) -> None:
+    """That would hand the throttle bucket back to whoever sets the header."""
+    os.environ[proxies.TRUSTED_PROXIES_ENV_VAR] = everyone
+    ran = []
+
+    code = cli.cmd_serve(_args(tmp_path, "serve"), run=lambda *a, **k: ran.append(a))
+
+    assert code == 2
+    assert ran == []
+    err = capsys.readouterr().err
+    assert proxies.TRUSTED_PROXIES_ENV_VAR in err
+    assert "every address" in err
+
+
+@pytest.mark.parametrize("typo", ["ingress-nginx", "10.42.0.0/33", "10.42.0.0/16 192.168.7.206"])
+def test_serve_refuses_a_proxy_entry_it_cannot_read(tmp_path, capsys, typo) -> None:
+    """Loudly, at startup. Quietly trusting nothing would leave the bench
+    lockable with the setting apparently in place."""
+    os.environ[proxies.TRUSTED_PROXIES_ENV_VAR] = typo
+    ran = []
+
+    code = cli.cmd_serve(_args(tmp_path, "serve"), run=lambda *a, **k: ran.append(a))
+
+    assert code == 2
+    assert ran == []
+    assert "not an address or a CIDR range" in capsys.readouterr().err

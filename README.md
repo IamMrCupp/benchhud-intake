@@ -375,6 +375,31 @@ Two constraints that are easy to get wrong and painful to debug:
 - **Exactly one writer.** The Deployment must stay at `replicas: 1` with
   `strategy: Recreate`.
 
+### Behind a reverse proxy
+
+Put TLS in front of it and two settings go with the proxy. Neither is on by
+default.
+
+- **`INTAKE_COOKIE_SECURE=1`** once every browser reaches it over HTTPS. Over
+  plain HTTP it stops sign-in from working at all.
+- **`INTAKE_TRUSTED_PROXIES`**: the proxy's address, or the range it lives in,
+  comma-separated. `10.42.0.0/16` and `192.168.7.206` are both fine.
+
+Without the second one, every browser looks like the proxy. Failed logins are
+counted per address, so five wrong passwords from any device lock sign-in for
+everyone for five minutes. With it, the server believes the proxy's
+`X-Forwarded-For` and `X-Forwarded-Proto`, each browser gets its own count, and
+the links in API responses say `https`.
+
+Keep the list as narrow as you can. Anything inside it can claim to be any
+address, which means it can pick its own lockout bucket. On Kubernetes that is
+usually the ingress controller's pod range, not the whole LAN. A header from
+anywhere outside the list is ignored. A proxy on the same machine counts too:
+list `127.0.0.1` if that is where yours runs.
+
+The server refuses to start on `*`, on a range that covers every address, and on
+an entry it can't read. A typo here should not quietly mean "trust nothing".
+
 ## License
 
 Open source under the [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html)
