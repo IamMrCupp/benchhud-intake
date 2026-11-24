@@ -35,6 +35,13 @@ spec:
             # corrupts on NFS rather than erroring.
             - name: INTAKE_SQLITE_NFS
               value: "0"
+            # Behind a TLS-terminating ingress, add both of these in your overlay:
+            #   INTAKE_COOKIE_SECURE=1
+            #   INTAKE_TRUSTED_PROXIES=<the ingress controller's pod range>
+            # Without the second, every browser shares one failed-login count
+            # and one person's wrong guesses lock out the bench. Keep it narrow:
+            # anything inside the range can choose its own count. See the
+            # README, "Behind a reverse proxy".
           envFrom:
             # INTAKE_PASSWORD_HASH (required), INTAKE_SESSION_SECRET and
             # INTAKE_API_TOKEN / INTAKE_SUBMIT_TOKEN (optional). See

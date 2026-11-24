@@ -76,9 +76,11 @@ login_limiter = RateLimiter()
 def _client_ip(request: Request) -> str | None:
     """Best-effort client address.
 
-    Deliberately ignores `X-Forwarded-For`: nothing terminates in front of this
-    service today, so honouring a client-supplied header would let anyone reset
-    their own throttle bucket by changing it. Revisit if a proxy ever lands.
+    Never reads `X-Forwarded-For` itself: a header anyone can set would let
+    them reset their own throttle bucket by changing it. Behind a reverse
+    proxy, name the proxy in `INTAKE_TRUSTED_PROXIES` (see `intake.cli`); the
+    server then puts the forwarded address here, and only when the connection
+    really came from that proxy.
     """
     return request.client.host if request.client else None
 

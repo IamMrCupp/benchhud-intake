@@ -63,5 +63,19 @@ Then `kubectl apply -k overlays/bench`.
   enforces NetworkPolicies, let the relay's pods reach this Service and
   nothing else public-facing.
 
+## Behind a LAN-only ingress
+
+A fixed LoadBalancer IP is plain HTTP. To put TLS in front, keep the Service a
+ClusterIP, add an Ingress on a controller the internet can't reach, and patch
+two variables into the Deployment:
+
+- `INTAKE_COOKIE_SECURE=1`
+- `INTAKE_TRUSTED_PROXIES=<the ingress controller's pod range>`
+
+Skip the second and every browser shares one failed-login count: five wrong
+passwords from any device lock sign-in for everyone for five minutes. The
+[main README](../../README.md#behind-a-reverse-proxy) has the detail and the
+reason to keep the range narrow.
+
 Backups aren't in the base. SQLite's `.backup` from a CronJob to a second
 volume is the pattern the maintainer's cluster uses.
