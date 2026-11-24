@@ -262,3 +262,33 @@ def test_password_dialog_needs_two_matching_entries(qtbot) -> None:
     assert not ok.isEnabled()
     dialog.second.setText("abc")
     assert ok.isEnabled() and dialog.password == "abc"
+
+
+def test_an_unpinned_install_gets_todays_port_written(tmp_path, env) -> None:
+    """Like the .deb's postinst: a later default change mustn't move the address."""
+    from intake.tray import DEFAULT_PORT, pin_port
+
+    settings.write_setting(tmp_path / "settings.env", auth.API_TOKEN_ENV_VAR, "tok")
+    settings.apply(tmp_path)
+    pin_port(tmp_path)
+    saved = settings.read_settings(tmp_path / "settings.env")
+    assert saved["INTAKE_PORT"] == str(DEFAULT_PORT) == env["INTAKE_PORT"]
+    assert saved[auth.API_TOKEN_ENV_VAR] == "tok"  # the other settings are kept
+
+
+def test_a_port_already_in_the_file_is_kept(tmp_path, env) -> None:
+    from intake.tray import pin_port
+
+    settings.write_setting(tmp_path / "settings.env", "INTAKE_PORT", "8000")
+    settings.apply(tmp_path)
+    pin_port(tmp_path)
+    assert settings.read_settings(tmp_path / "settings.env")["INTAKE_PORT"] == "8000"
+    assert env["INTAKE_PORT"] == "8000"
+
+
+def test_a_port_from_the_environment_is_not_written_down(tmp_path, env) -> None:
+    from intake.tray import pin_port
+
+    env["INTAKE_PORT"] = "9000"
+    pin_port(tmp_path)
+    assert not (tmp_path / "settings.env").exists()

@@ -294,6 +294,20 @@ def smoke(data: Path) -> int:
     return 0
 
 
+def pin_port(data: Path) -> None:
+    """Write the port into settings.env if nothing sets it yet.
+
+    The .deb's postinst does the same, so changing ``DEFAULT_PORT`` later never
+    moves a running install to a new address. Every tray install that has
+    updated since v0.3.0 already serves on 8401, so that's what gets pinned. An
+    ``INTAKE_PORT`` from the environment or the file is left alone.
+    """
+    if PORT_ENV in os.environ:
+        return
+    settings.write_setting(settings.settings_path(data), PORT_ENV, str(DEFAULT_PORT))
+    os.environ[PORT_ENV] = str(DEFAULT_PORT)
+
+
 def main() -> int:
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setQuitOnLastWindowClosed(False)  # a tray app has no window to close
@@ -310,6 +324,7 @@ def main() -> int:
             "There's no menu bar or system tray to live in. Run `benchhud-intake serve` instead.",
         )
         return 1
+    pin_port(data)
     tray = IntakeTray(data)
     tray.icon.show()
     tray.start()
