@@ -400,6 +400,15 @@ list `127.0.0.1` if that is where yours runs.
 The server refuses to start on `*`, on a range that covers every address, and on
 an entry it can't read. A typo here should not quietly mean "trust nothing".
 
+## Support
+
+If it's earned a spot on your bench and you'd like to throw a coffee my way:
+
+- [Ko-fi](https://ko-fi.com/IamMrCupp)
+- [Buy Me a Coffee](https://buymeacoffee.com/IamMrCupp)
+
+No pressure — it stays open source either way.
+
 ## License
 
 Open source under the [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html)
